@@ -227,7 +227,7 @@ class RestaurantSearcher:
                 walking_time=estimate_walking_time(distance),
             )
 
-            # 네이버 지도 링크는 상호명만 사용
+            # 네이버 지도 링크는 상호명만 사용 (주소 포함 시 검색 실패 사례 방지)
             if restaurant.name:
                 restaurant.map_url = f"https://map.naver.com/v5/search/{quote(restaurant.name)}"
 

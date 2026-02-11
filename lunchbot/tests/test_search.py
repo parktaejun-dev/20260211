@@ -258,3 +258,59 @@ def test_searcher_custom_center():
     )
     assert searcher.center_lat == 37.0
     assert searcher.center_lng == 127.0
+
+
+def test_map_url_and_phone_extraction(monkeypatch):
+    """지도가 주소 없이 상호명만 사용하는지, 전화번호가 추출되는지 확인."""
+
+    class MockResponse:
+        def __init__(self, payload):
+            self._payload = payload
+
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return self._payload
+
+    def mock_get(url, *args, **kwargs):
+        if url == NAVER_SEARCH_API_URL:
+            return MockResponse(
+                {
+                    "items": [
+                        {
+                            "title": "<b>맛있는 식당</b>",
+                            "address": "서울 종로구",
+                            "roadAddress": "서울 종로구 세종대로 123",
+                            "mapx": "310000",
+                            "mapy": "552000",
+                            "category": "한식",
+                            "description": "맛집입니다",
+                            "telephone": "02-1234-5678",
+                            "link": "https://restaurant.com",
+                        }
+                    ]
+                }
+            )
+        return MockResponse({"items": []})
+
+    monkeypatch.setattr("core.search.httpx.get", mock_get)
+
+    searcher = RestaurantSearcher(
+        client_id="id",
+        client_secret="secret",
+    )
+    results = searcher.search("광화문", "한식")
+
+    assert len(results) == 1
+    r = results[0]
+
+    # 1. 지도 링크 확인: 상호명만 포함되어야 함
+    # 주소(세종대로, 123 등)가 포함되면 안 됨
+    assert "https://map.naver.com/v5/search/" in r.map_url
+    assert "%EB%A7%9B%EC%9E%88%EB%8A%94%20%EC%8B%9D%EB%8B%B9" in r.map_url  # '맛있는 식당' URL 인코딩
+    assert "123" not in r.map_url
+    assert "세종대로" not in r.map_url
+
+    # 2. 전화번호 확인
+    assert r.phone == "02-1234-5678"
