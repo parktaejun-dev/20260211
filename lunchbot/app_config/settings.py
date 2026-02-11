@@ -5,6 +5,7 @@ AREA_CENTER = {
     "lat": 37.5700,
     "lng": 126.9768,
     "name": "한국프레스센터",
+    "search_name": "광화문",  # 네이버 검색 API용 지역명
 }
 
 RADIUS_OPTIONS = [500, 1000, 1500, 2000]  # meters (기본 1km, 최대 2km)
