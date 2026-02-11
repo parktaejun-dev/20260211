@@ -53,7 +53,7 @@ TIME_SLOTS = [
 # 인원 범위
 MIN_PARTY_SIZE = 2
 MAX_PARTY_SIZE = 30
-DEFAULT_PARTY_SIZE = 12
+DEFAULT_PARTY_SIZE = 6
 
 # 네이버 API
 NAVER_SEARCH_API_URL = "https://openapi.naver.com/v1/search/local.json"

@@ -53,6 +53,30 @@ def render_search_results(
             f"**{selected.name}** | {date_str} {time_str} | {party}명"
         )
 
+        # ── DB 액션 버튼 (즐겨찾기 / 제외) ────────────────
+        from core.db import db
+
+        col_act1, col_act2 = st.columns(2)
+        
+        with col_act1:
+            if db.is_favorite(selected.name, selected.address):
+                if st.button("❌ 즐겨찾기 해제", key=f"fav_del_{selected.name}"):
+                    db.remove_favorite(selected.name, selected.address)
+                    st.rerun()
+            else:
+                if st.button("⭐ 즐겨찾기 추가", key=f"fav_add_{selected.name}"):
+                    if db.add_favorite(selected.name, selected.address):
+                        st.toast("즐겨찾기에 추가되었습니다!", icon="⭐")
+                        st.rerun()
+
+        with col_act2:
+            if st.button("🚫 이 식당 제외하기", key=f"excl_{selected.name}"):
+                if db.add_exclusion(selected.name, selected.address, reason="사용자 선택"):
+                    st.warning("제외 목록에 추가되었습니다. 앞으로 검색되지 않습니다.")
+                    st.session_state["search_results"] = None  # 결과 초기화
+                    st.rerun()
+        # ────────────────────────────────────────────────
+
         info_text = (
             f"[부서점심 안내]\n"
             f"🏪 식당: {selected.name}\n"

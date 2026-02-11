@@ -38,7 +38,7 @@ def render_input_form() -> dict | None:
             area = st.selectbox(
                 "📍 지역",
                 options=list(AREA_OPTIONS.keys()),
-                index=0,
+                index=list(AREA_OPTIONS.keys()).index("무교동"),
             )
 
         with col2:
@@ -58,7 +58,7 @@ def render_input_form() -> dict | None:
             budget = st.selectbox(
                 "💰 1인 예산",
                 options=list(BUDGET_OPTIONS.keys()),
-                index=0,
+                index=list(BUDGET_OPTIONS.keys()).index("1.5~2만원"),
             )
 
         with col4:

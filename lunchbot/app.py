@@ -23,7 +23,7 @@ from ui.styles import CUSTOM_CSS
 from ui.components import render_header
 from ui.pages.home import render_input_form
 from ui.pages.search_results import render_search_results
-from ui.pages.history import render_history_page, save_search_result
+from ui.pages.history import render_history_page
 from utils.date_helper import format_date_korean
 
 
@@ -130,7 +130,10 @@ with tab_search:
 
         if selected:
             # 이력 저장
-            save_search_result(
+            # 이력 저장
+            from core.db import db
+
+            db.save_search_result(
                 restaurant_name=selected.name,
                 address=selected.road_address or selected.address,
                 phone=selected.phone,

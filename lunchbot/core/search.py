@@ -187,8 +187,17 @@ class RestaurantSearcher:
         except httpx.RequestError as e:
             raise RuntimeError(f"네이버 API 요청 실패: {str(e)}")
 
+        from core.db import db
+        
         restaurants = []
         for item in data.get("items", []):
+            title = _clean_html(item.get("title", ""))
+            address = item.get("address", "")
+            
+            # 제외된 식당 필터링
+            if db.is_excluded(title, address):
+                continue
+
             lat, lng = self.center_lat, self.center_lng
             distance = 0.0
             try:
