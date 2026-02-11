@@ -7,14 +7,14 @@ from pathlib import Path
 # 프로젝트 루트 경로 추가
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app_config.settings import DEFAULT_PARTY_SIZE, AREA_OPTIONS
+from app_config.settings import DEFAULT_PARTY_SIZE, AREA_CENTER
 from core.db import DatabaseManager
 
 
 def test_default_settings():
     """기본 설정값 변경 확인"""
     assert DEFAULT_PARTY_SIZE == 6, "기본 인원수가 6명이어야 합니다."
-    assert "무교동" in AREA_OPTIONS, "무교동 옵션이 존재해야 합니다."
+    assert AREA_CENTER["name"] == "한국프레스센터", "기준점이 한국프레스센터여야 합니다."
 
 
 def test_db_operations(tmp_path):

@@ -21,7 +21,7 @@ from core.search import RestaurantSearcher
 from core.notification import SlackNotifier
 from ui.styles import CUSTOM_CSS
 from ui.components import render_header
-from ui.pages.home import render_input_form
+from ui.pages.home import render_input_form, render_auto_select_button
 from ui.pages.search_results import render_search_results
 from ui.pages.history import render_history_page
 from utils.date_helper import format_date_korean
@@ -79,47 +79,65 @@ render_header()
 tab_search, tab_history = st.tabs(["🔍 맛집 검색", "📜 검색 이력"])
 
 
+def _run_search(form_data: dict) -> None:
+    """검색을 실행하고 결과를 세션에 저장합니다."""
+    import random
+
+    with st.spinner("🔍 맛집을 검색하고 있습니다..."):
+        try:
+            coords = form_data["area_coords"]
+            searcher = RestaurantSearcher(
+                client_id=NAVER_CLIENT_ID,
+                client_secret=NAVER_CLIENT_SECRET,
+                center_lat=coords["lat"],
+                center_lng=coords["lng"],
+            )
+
+            results = searcher.search(
+                area_name=form_data["area"],
+                cuisine_keyword=form_data["cuisine_keyword"],
+                radius=form_data["radius"],
+            )
+
+            # 결과가 없으면 자동 반경 확대
+            if not results:
+                results, _ = searcher.search_with_expanded_radius(
+                    area_name=form_data["area"],
+                    cuisine_keyword=form_data["cuisine_keyword"],
+                    initial_radius=form_data["radius"],
+                )
+                if results:
+                    st.info("검색 반경을 자동으로 넓혔습니다.")
+
+            # 자동선택 모드: 3개만 랜덤 선정
+            if form_data.get("auto_select") and results and len(results) > 3:
+                results = random.sample(results, 3)
+
+            st.session_state[SESSION_KEY_SEARCH_RESULTS] = results
+            st.session_state[SESSION_KEY_INPUT_DATA] = form_data
+            st.rerun()
+
+        except Exception as e:
+            st.error(f"검색 중 오류가 발생했습니다: {str(e)}")
+
+
 # ── 검색 탭 ───────────────────────────────────────────────
 with tab_search:
 
     # 검색 결과가 없을 때: 입력 폼 표시
     if st.session_state[SESSION_KEY_SEARCH_RESULTS] is None:
+
+        # 자동 선택 버튼
+        auto_data = render_auto_select_button()
+        if auto_data:
+            _run_search(auto_data)
+
+        st.markdown("---")
+
+        # 수동 검색 폼
         form_data = render_input_form()
-
         if form_data:
-            # 검색 실행
-            with st.spinner("🔍 맛집을 검색하고 있습니다..."):
-                try:
-                    coords = form_data["area_coords"]
-                    searcher = RestaurantSearcher(
-                        client_id=NAVER_CLIENT_ID,
-                        client_secret=NAVER_CLIENT_SECRET,
-                        center_lat=coords["lat"],
-                        center_lng=coords["lng"],
-                    )
-
-                    results = searcher.search(
-                        area_name=form_data["area"],
-                        cuisine_keyword=form_data["cuisine_keyword"],
-                        radius=form_data["radius"],
-                    )
-
-                    # 결과가 없으면 자동 반경 확대
-                    if not results:
-                        results, _ = searcher.search_with_expanded_radius(
-                            area_name=form_data["area"],
-                            cuisine_keyword=form_data["cuisine_keyword"],
-                            initial_radius=form_data["radius"],
-                        )
-                        if results:
-                            st.info("검색 반경을 자동으로 넓혔습니다.")
-
-                    st.session_state[SESSION_KEY_SEARCH_RESULTS] = results
-                    st.session_state[SESSION_KEY_INPUT_DATA] = form_data
-                    st.rerun()
-
-                except Exception as e:
-                    st.error(f"검색 중 오류가 발생했습니다: {str(e)}")
+            _run_search(form_data)
 
     # 검색 결과가 있을 때: 결과 표시
     else:
@@ -129,7 +147,6 @@ with tab_search:
         selected = render_search_results(results, input_data)
 
         if selected:
-            # 이력 저장
             # 이력 저장
             from core.db import db
 
@@ -162,9 +179,12 @@ with tab_search:
         if st.button("🔄 새로 검색하기", use_container_width=True):
             st.session_state[SESSION_KEY_SEARCH_RESULTS] = None
             st.session_state[SESSION_KEY_INPUT_DATA] = None
+            if "random_picks" in st.session_state:
+                del st.session_state["random_picks"]
             st.rerun()
 
 
 # ── 이력 탭 ───────────────────────────────────────────────
 with tab_history:
     render_history_page()
+

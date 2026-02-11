@@ -150,7 +150,7 @@ class RestaurantSearcher:
         self,
         area_name: str,
         cuisine_keyword: str,
-        radius: int = 500,
+        radius: int = 1000,
         display: int = 10,
     ) -> list[Restaurant]:
         """
@@ -254,19 +254,20 @@ class RestaurantSearcher:
         self,
         area_name: str,
         cuisine_keyword: str,
-        initial_radius: int = 500,
+        initial_radius: int = 1000,
+        max_radius: int = 2000,
     ) -> tuple[list[Restaurant], int]:
         """
-        검색 결과가 부족하면 반경을 자동 확대합니다.
+        검색 결과가 부족하면 반경을 자동 확대합니다 (최대 2km).
 
         Returns:
             (식당 리스트, 최종 사용된 반경)
         """
-        for radius in [initial_radius, initial_radius * 2, initial_radius * 4]:
+        for radius in [initial_radius, min(initial_radius * 2, max_radius)]:
             results = self.search(area_name, cuisine_keyword, radius)
             if results:
                 return results, radius
 
-        # 필터링 없이 전체 반환
-        results = self.search(area_name, cuisine_keyword, radius=999999)
-        return results, 999999
+        # 최대 반경으로 마지막 시도
+        results = self.search(area_name, cuisine_keyword, radius=max_radius)
+        return results, max_radius

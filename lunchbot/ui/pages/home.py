@@ -4,16 +4,44 @@ import streamlit as st
 from datetime import date
 
 from app_config.settings import (
-    AREA_OPTIONS,
+    AREA_CENTER,
     CUISINE_TYPES,
     BUDGET_OPTIONS,
     TIME_SLOTS,
     RADIUS_OPTIONS,
+    DEFAULT_RADIUS,
     MIN_PARTY_SIZE,
     MAX_PARTY_SIZE,
     DEFAULT_PARTY_SIZE,
 )
 from utils.date_helper import get_next_monday
+
+
+def render_auto_select_button() -> dict | None:
+    """
+    자동 선택 버튼을 렌더링합니다.
+    클릭 시 기본 설정으로 즉시 검색을 실행합니다 (전체 음식 종류).
+    """
+    st.markdown("### 🎲 자동 선택")
+    st.caption(f"📍 기준: {AREA_CENTER['name']} | 반경 {DEFAULT_RADIUS // 1000}km | 전체 음식")
+
+    if st.button("🎲 자동으로 3곳 추천받기", type="primary", use_container_width=True):
+        default_date = get_next_monday()
+        return {
+            "cuisine": "전체",
+            "cuisine_keyword": "맛집",  # 전체 음식 종류
+            "area": AREA_CENTER["name"],
+            "area_coords": {"lat": AREA_CENTER["lat"], "lng": AREA_CENTER["lng"]},
+            "radius": DEFAULT_RADIUS,
+            "budget": "상관없음",
+            "budget_range": (0, 999999),
+            "party_size": DEFAULT_PARTY_SIZE,
+            "date": default_date,
+            "time": "12:00",
+            "auto_select": True,  # 자동선택 플래그
+        }
+
+    return None
 
 
 def render_input_form() -> dict | None:
@@ -23,6 +51,9 @@ def render_input_form() -> dict | None:
     """
     with st.form("search_form"):
         st.subheader("📌 검색 조건 입력")
+
+        # 기준점 표시
+        st.caption(f"📍 기준: {AREA_CENTER['name']} (서울 중구 세종대로 124)")
 
         # 음식 종류
         cuisine = st.selectbox(
@@ -34,26 +65,16 @@ def render_input_form() -> dict | None:
         col1, col2 = st.columns(2)
 
         with col1:
-            # 지역 선택
-            area = st.selectbox(
-                "📍 지역",
-                options=list(AREA_OPTIONS.keys()),
-                index=list(AREA_OPTIONS.keys()).index("무교동"),
-            )
-
-        with col2:
             # 반경
-            radius_labels = {300: "300m", 500: "500m", 1000: "1km"}
+            radius_labels = {500: "500m", 1000: "1km", 1500: "1.5km", 2000: "2km"}
             radius = st.select_slider(
                 "🔍 검색 반경",
                 options=RADIUS_OPTIONS,
-                value=500,
+                value=DEFAULT_RADIUS,
                 format_func=lambda x: radius_labels[x],
             )
 
-        col3, col4 = st.columns(2)
-
-        with col3:
+        with col2:
             # 예산
             budget = st.selectbox(
                 "💰 1인 예산",
@@ -61,7 +82,9 @@ def render_input_form() -> dict | None:
                 index=list(BUDGET_OPTIONS.keys()).index("1.5~2만원"),
             )
 
-        with col4:
+        col3, col4 = st.columns(2)
+
+        with col3:
             # 인원수
             party_size = st.number_input(
                 "👥 인원수",
@@ -70,6 +93,9 @@ def render_input_form() -> dict | None:
                 value=DEFAULT_PARTY_SIZE,
                 step=1,
             )
+
+        with col4:
+            pass  # 균형 맞추기
 
         col5, col6 = st.columns(2)
 
@@ -100,8 +126,8 @@ def render_input_form() -> dict | None:
             return {
                 "cuisine": cuisine,
                 "cuisine_keyword": CUISINE_TYPES[cuisine],
-                "area": area,
-                "area_coords": AREA_OPTIONS[area],
+                "area": AREA_CENTER["name"],
+                "area_coords": {"lat": AREA_CENTER["lat"], "lng": AREA_CENTER["lng"]},
                 "radius": radius,
                 "budget": budget,
                 "budget_range": BUDGET_OPTIONS[budget],
@@ -111,3 +137,4 @@ def render_input_form() -> dict | None:
             }
 
     return None
+
