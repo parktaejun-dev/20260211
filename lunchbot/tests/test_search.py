@@ -42,9 +42,50 @@ def test_clean_html():
 def test_katec_to_wgs84():
     """KATEC 좌표 변환 테스트."""
     lat, lng = _katec_to_wgs84(310000, 552000)
-    # 서울 부근 좌표가 나와야 함
-    assert 33 < lat < 40
-    assert 124 < lng < 130
+    # 광화문 인근 좌표가 나와야 함
+    assert 37.0 < lat < 38.0
+    assert 126.0 < lng < 128.0
+
+
+def test_search_with_invalid_map_coordinates(monkeypatch):
+    """mapx/mapy 파싱 불가 데이터가 있어도 검색이 실패하지 않아야 한다."""
+
+    class MockResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "items": [
+                    {
+                        "title": "<b>테스트 식당</b>",
+                        "address": "서울 종로구",
+                        "roadAddress": "서울 종로구 세종대로",
+                        "mapx": "",
+                        "mapy": None,
+                        "category": "한식",
+                        "description": "<b>맛집</b>",
+                        "telephone": "02-0000-0000",
+                        "link": "https://example.com",
+                    }
+                ]
+            }
+
+    def mock_get(*args, **kwargs):
+        return MockResponse()
+
+    monkeypatch.setattr("core.search.httpx.get", mock_get)
+
+    searcher = RestaurantSearcher(
+        client_id="id",
+        client_secret="secret",
+        center_lat=37.5682,
+        center_lng=126.9783,
+    )
+    results = searcher.search("광화문", "한식")
+
+    assert len(results) == 1
+    assert results[0].name == "테스트 식당"
 
 
 def test_searcher_init():
