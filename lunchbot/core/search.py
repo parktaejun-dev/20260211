@@ -216,13 +216,25 @@ class RestaurantSearcher:
             lat, lng = self.center_lat, self.center_lng
             distance = 0.0
             try:
-                mapx = int(item.get("mapx", 0))
-                mapy = int(item.get("mapy", 0))
-                converted_lat, converted_lng = _katec_to_wgs84(mapx, mapy)
+                raw_x = item.get("mapx", 0)
+                raw_y = item.get("mapy", 0)
+                mapx = int(raw_x) if raw_x else 0
+                mapy = int(raw_y) if raw_y else 0
 
-                if _is_reasonable_korea_coordinate(converted_lat, converted_lng):
-                    lat, lng = converted_lat, converted_lng
-                    distance = haversine_distance(self.center_lat, self.center_lng, lat, lng)
+                if mapx > 0 and mapy > 0:
+                    # 2023.08 이후: WGS84 좌표 (정수형, 10^7 배율)
+                    # 예: mapx=1269873882 → lng=126.9873882
+                    if mapx > 1000000:
+                        converted_lng = mapx / 1e7
+                        converted_lat = mapy / 1e7
+                    else:
+                        # 혹시 구형 KATEC 좌표가 오면 근사 변환
+                        converted_lng = 123.76 + (mapx * 1.0e-5)
+                        converted_lat = 32.85 + (mapy * 8.8e-6)
+
+                    if _is_reasonable_korea_coordinate(converted_lat, converted_lng):
+                        lat, lng = converted_lat, converted_lng
+                        distance = haversine_distance(self.center_lat, self.center_lng, lat, lng)
             except (TypeError, ValueError):
                 pass
 
