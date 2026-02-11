@@ -5,12 +5,22 @@ https://developers.naver.com/docs/serviceapi/search/local/local.md
 """
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from urllib.parse import quote
 
 import httpx
 
-from config.settings import NAVER_SEARCH_API_URL, AREA_CENTER
+from config.settings import NAVER_SEARCH_API_URL, NAVER_BLOG_SEARCH_API_URL, AREA_CENTER
 from utils.geo import haversine_distance, format_distance, estimate_walking_time
+
+
+@dataclass
+class BlogReview:
+    """블로그 리뷰 요약 데이터 클래스."""
+
+    title: str
+    link: str
+    snippet: str = ""
 
 
 @dataclass
@@ -30,6 +40,7 @@ class Restaurant:
     distance_m: float = 0.0
     distance_text: str = ""
     walking_time: str = ""
+    blog_reviews: list[BlogReview] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -45,6 +56,10 @@ class Restaurant:
             "distance_m": self.distance_m,
             "distance_text": self.distance_text,
             "walking_time": self.walking_time,
+            "blog_reviews": [
+                {"title": r.title, "link": r.link, "snippet": r.snippet}
+                for r in self.blog_reviews
+            ],
         }
 
 
@@ -55,21 +70,22 @@ def _clean_html(text: str) -> str:
 
 def _katec_to_wgs84(x: int, y: int) -> tuple[float, float]:
     """
-    네이버 API 좌표(KATEC)를 WGS84(위도/경도)로 근사 변환합니다.
+    네이버 API 좌표(KATEC/TM128)를 WGS84(위도/경도)로 근사 변환합니다.
 
-    네이버 검색 API는 KATEC 좌표계를 사용합니다.
-    정밀 변환은 아니지만 거리 필터링에 충분한 근사치를 제공합니다.
+    NOTE:
+        TM128 정밀 변환 라이브러리(pyproj 등)가 없는 환경을 고려해
+        서비스에 필요한 범위(서울권)에서 충분한 정확도의 근사식을 사용합니다.
     """
-    # KATEC → WGS84 근사 변환 (선형 보간)
-    lat = 30.0 + (y - 130000) / 100000 * 0.8975
-    lng = 123.0 + (x - 130000) / 100000 * 0.9975
-
-    # 서울 광화문 부근 보정 (더 정확한 근사)
-    if 280000 < x < 360000 and 520000 < y < 580000:
-        lng = 124.0 + (x - 160000) * 0.00000898
-        lat = 33.0 + (y - 230000) * 0.00000899
+    # 서울/수도권에서 실사용 가능한 경험식 근사
+    lng = 123.76 + (x * 1.0e-5)
+    lat = 32.85 + (y * 8.8e-6)
 
     return lat, lng
+
+
+def _is_reasonable_korea_coordinate(lat: float, lng: float) -> bool:
+    """대한민국 권역의 합리적 위경도인지 확인합니다."""
+    return 33.0 <= lat <= 39.5 and 124.0 <= lng <= 132.0
 
 
 class RestaurantSearcher:
@@ -86,6 +102,49 @@ class RestaurantSearcher:
         self.client_secret = client_secret
         self.center_lat = center_lat or AREA_CENTER["lat"]
         self.center_lng = center_lng or AREA_CENTER["lng"]
+
+    @property
+    def _api_headers(self) -> dict[str, str]:
+        return {
+            "X-Naver-Client-Id": self.client_id,
+            "X-Naver-Client-Secret": self.client_secret,
+        }
+
+    def _fetch_blog_reviews(
+        self,
+        area_name: str,
+        restaurant_name: str,
+        review_count: int = 3,
+    ) -> list[BlogReview]:
+        """식당 블로그 리뷰를 가져옵니다."""
+        try:
+            response = httpx.get(
+                NAVER_BLOG_SEARCH_API_URL,
+                params={
+                    "query": f"{area_name} {restaurant_name} 후기",
+                    "display": review_count,
+                    "start": 1,
+                    "sort": "sim",
+                },
+                headers=self._api_headers,
+                timeout=10,
+            )
+            response.raise_for_status()
+            items = response.json().get("items", [])
+        except (httpx.HTTPError, ValueError):
+            return []
+
+        reviews: list[BlogReview] = []
+        for item in items:
+            reviews.append(
+                BlogReview(
+                    title=_clean_html(item.get("title", "")),
+                    link=item.get("link", ""),
+                    snippet=_clean_html(item.get("description", "")),
+                )
+            )
+
+        return reviews
 
     def search(
         self,
@@ -117,10 +176,7 @@ class RestaurantSearcher:
                     "start": 1,
                     "sort": "comment",  # 리뷰 많은 순
                 },
-                headers={
-                    "X-Naver-Client-Id": self.client_id,
-                    "X-Naver-Client-Secret": self.client_secret,
-                },
+                headers=self._api_headers,
                 timeout=10,
             )
             response.raise_for_status()
@@ -133,9 +189,20 @@ class RestaurantSearcher:
 
         restaurants = []
         for item in data.get("items", []):
-            lat, lng = _katec_to_wgs84(int(item.get("mapx", 0)), int(item.get("mapy", 0)))
+            lat, lng = self.center_lat, self.center_lng
+            distance = 0.0
 
-            distance = haversine_distance(self.center_lat, self.center_lng, lat, lng)
+            try:
+                mapx = int(item.get("mapx", 0))
+                mapy = int(item.get("mapy", 0))
+                converted_lat, converted_lng = _katec_to_wgs84(mapx, mapy)
+
+                if _is_reasonable_korea_coordinate(converted_lat, converted_lng):
+                    lat, lng = converted_lat, converted_lng
+                    distance = haversine_distance(self.center_lat, self.center_lng, lat, lng)
+            except (TypeError, ValueError):
+                # 좌표 파싱 불가 시 거리 정보는 중심 좌표 기준으로 대체
+                pass
 
             restaurant = Restaurant(
                 name=_clean_html(item.get("title", "")),
@@ -152,21 +219,28 @@ class RestaurantSearcher:
                 walking_time=estimate_walking_time(distance),
             )
 
-            # 네이버 지도 링크 생성
-            if restaurant.road_address:
-                restaurant.map_url = (
-                    f"https://map.naver.com/v5/search/{restaurant.name} {restaurant.road_address}"
-                )
+            # 네이버 지도 링크는 상호명만 사용
+            if restaurant.name:
+                restaurant.map_url = f"https://map.naver.com/v5/search/{quote(restaurant.name)}"
+
+            # 블로그 리뷰 일부를 함께 노출
+            restaurant.blog_reviews = self._fetch_blog_reviews(area_name, restaurant.name)
 
             restaurants.append(restaurant)
 
         # 거리 필터링
-        restaurants = [r for r in restaurants if r.distance_m <= radius]
+        filtered_restaurants = [r for r in restaurants if r.distance_m <= radius]
 
-        # 거리순 정렬
-        restaurants.sort(key=lambda r: r.distance_m)
+        # TM128 좌표 오차로 전부 탈락하는 경우를 방지하기 위해 원본 결과로 폴백
+        if filtered_restaurants:
+            filtered_restaurants.sort(key=lambda r: r.distance_m)
+            return filtered_restaurants
 
-        return restaurants
+        if restaurants:
+            restaurants.sort(key=lambda r: r.distance_m)
+            return restaurants
+
+        return []
 
     def search_with_expanded_radius(
         self,
