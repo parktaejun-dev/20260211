@@ -4,7 +4,9 @@ import streamlit as st
 from datetime import date
 
 from config.settings import (
+    AREA_OPTIONS,
     CUISINE_TYPES,
+    BUDGET_OPTIONS,
     TIME_SLOTS,
     RADIUS_OPTIONS,
     MIN_PARTY_SIZE,
@@ -19,40 +21,47 @@ def render_input_form() -> dict | None:
     사용자 입력 폼을 렌더링합니다.
     제출 시 입력값 딕셔너리를 반환, 미제출 시 None 반환.
     """
-    with st.form("reservation_form"):
-        st.subheader("📌 예약 정보 입력")
+    with st.form("search_form"):
+        st.subheader("📌 검색 조건 입력")
 
         # 음식 종류
         cuisine = st.selectbox(
-            "음식 종류",
+            "🍽️ 음식 종류",
             options=list(CUISINE_TYPES.keys()),
             index=0,
-            help="원하는 음식 종류를 선택하세요",
         )
 
         col1, col2 = st.columns(2)
 
         with col1:
-            # 날짜 선택 (기본: 다음 월요일)
-            default_date = get_next_monday()
-            reservation_date = st.date_input(
-                "📅 날짜",
-                value=default_date,
-                min_value=date.today(),
-                help="예약할 날짜를 선택하세요 (기본: 다음 월요일)",
+            # 지역 선택
+            area = st.selectbox(
+                "📍 지역",
+                options=list(AREA_OPTIONS.keys()),
+                index=0,
             )
 
         with col2:
-            # 시간 선택
-            time_slot = st.selectbox(
-                "🕐 시간",
-                options=TIME_SLOTS,
-                index=TIME_SLOTS.index("12:00"),
+            # 반경
+            radius_labels = {300: "300m", 500: "500m", 1000: "1km"}
+            radius = st.select_slider(
+                "🔍 검색 반경",
+                options=RADIUS_OPTIONS,
+                value=500,
+                format_func=lambda x: radius_labels[x],
             )
 
         col3, col4 = st.columns(2)
 
         with col3:
+            # 예산
+            budget = st.selectbox(
+                "💰 1인 예산",
+                options=list(BUDGET_OPTIONS.keys()),
+                index=0,
+            )
+
+        with col4:
             # 인원수
             party_size = st.number_input(
                 "👥 인원수",
@@ -62,67 +71,69 @@ def render_input_form() -> dict | None:
                 step=1,
             )
 
-        with col4:
-            # 반경
-            radius_labels = {300: "300m", 500: "500m", 1000: "1km"}
-            radius = st.select_slider(
-                "📍 검색 반경",
-                options=RADIUS_OPTIONS,
-                value=500,
-                format_func=lambda x: radius_labels[x],
+        col5, col6 = st.columns(2)
+
+        with col5:
+            # 날짜 선택 (기본: 다음 월요일)
+            default_date = get_next_monday()
+            reservation_date = st.date_input(
+                "📅 날짜",
+                value=default_date,
+                min_value=date.today(),
+                help="기본: 다음 월요일",
             )
 
-        # 요청사항 (선택)
-        request_note = st.text_input(
-            "💬 요청사항 (선택)",
-            placeholder="예: 단체석 준비 부탁드립니다",
-        )
+        with col6:
+            # 시간 선택
+            time_slot = st.selectbox(
+                "🕐 시간",
+                options=TIME_SLOTS,
+                index=TIME_SLOTS.index("12:00"),
+            )
 
         # 제출 버튼
-        col_search, col_reserve = st.columns(2)
-        with col_search:
-            search_submitted = st.form_submit_button(
-                "🔍 맛집 검색하기", use_container_width=True
-            )
-        with col_reserve:
-            direct_reserve = st.form_submit_button(
-                "🚀 바로 예약하기", use_container_width=True
-            )
+        submitted = st.form_submit_button(
+            "🔍 맛집 검색하기", type="primary", use_container_width=True
+        )
 
-        if search_submitted or direct_reserve:
+        if submitted:
             return {
                 "cuisine": cuisine,
                 "cuisine_keyword": CUISINE_TYPES[cuisine],
+                "area": area,
+                "area_coords": AREA_OPTIONS[area],
+                "radius": radius,
+                "budget": budget,
+                "budget_range": BUDGET_OPTIONS[budget],
+                "party_size": party_size,
                 "date": reservation_date,
                 "time": time_slot,
-                "party_size": party_size,
-                "radius": radius,
-                "request_note": request_note,
-                "direct_reserve": direct_reserve,
             }
 
     return None
 
 
-def render_login_sidebar():
-    """사이드바에 네이버 로그인 정보 입력 폼을 렌더링합니다."""
+def render_sidebar():
+    """사이드바에 API 설정과 알림 설정을 렌더링합니다."""
     with st.sidebar:
-        st.header("🔐 네이버 로그인")
-
-        naver_id = st.text_input(
-            "네이버 ID",
-            type="default",
-            placeholder="네이버 아이디 입력",
-            key="naver_id",
+        st.header("🔑 네이버 API 설정")
+        st.caption(
+            "[네이버 개발자센터](https://developers.naver.com)에서\n"
+            "애플리케이션 등록 후 발급받은 키를 입력하세요."
         )
-        naver_pw = st.text_input(
-            "비밀번호",
+
+        client_id = st.text_input(
+            "Client ID",
             type="password",
-            placeholder="비밀번호 입력",
-            key="naver_pw",
+            placeholder="네이버 API Client ID",
+            key="naver_client_id",
         )
-
-        st.caption("⚠️ 로그인 정보는 세션에만 유지되며 저장되지 않습니다.")
+        client_secret = st.text_input(
+            "Client Secret",
+            type="password",
+            placeholder="네이버 API Client Secret",
+            key="naver_client_secret",
+        )
 
         # Slack 알림 설정 (선택)
         st.divider()
@@ -135,7 +146,7 @@ def render_login_sidebar():
         )
 
         return {
-            "naver_id": naver_id,
-            "naver_pw": naver_pw,
+            "client_id": client_id,
+            "client_secret": client_secret,
             "slack_webhook": slack_webhook,
         }
