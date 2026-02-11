@@ -8,6 +8,7 @@
 실행: streamlit run app.py
 """
 
+import subprocess
 import sys
 from pathlib import Path
 
@@ -15,6 +16,30 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 import streamlit as st
+
+
+# Playwright Chromium 자동 설치 (Streamlit Cloud 배포 대응)
+@st.cache_resource
+def _install_playwright_browser():
+    """최초 1회만 Chromium을 설치합니다."""
+    subprocess.run(
+        [sys.executable, "-m", "playwright", "install", "chromium"],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        [sys.executable, "-m", "playwright", "install-deps", "chromium"],
+        capture_output=True,
+    )
+
+
+try:
+    _install_playwright_browser()
+except Exception as e:
+    st.error(f"Chromium 설치 실패: {e}")
+    st.info("수동으로 터미널에서 `playwright install chromium`을 실행해주세요.")
+    st.stop()
+
 from playwright.sync_api import sync_playwright
 
 from config.constants import (
