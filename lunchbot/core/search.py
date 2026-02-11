@@ -149,10 +149,14 @@ class RestaurantSearcher:
         self,
         area_name: str,
         cuisine_keyword: str,
+        budget_keyword: str = "",
         display: int = 5,
     ) -> list[dict]:
         """단일 지역으로 네이버 API를 호출, raw items을 반환합니다."""
-        query = f"{area_name} {cuisine_keyword}"
+        parts = [area_name, cuisine_keyword]
+        if budget_keyword:
+            parts.append(budget_keyword)
+        query = " ".join(parts)
 
         try:
             response = httpx.get(
@@ -177,6 +181,7 @@ class RestaurantSearcher:
         cuisine_keyword: str,
         radius: int = 1000,
         display: int = 10,
+        budget_keyword: str = "",
     ) -> list[Restaurant]:
         """
         여러 지역명으로 네이버 검색 API를 호출하고 결과를 병합합니다.
@@ -186,6 +191,7 @@ class RestaurantSearcher:
             cuisine_keyword: 검색 키워드 (예: "한식", "맛집")
             radius: 검색 반경 (미터)
             display: 결과 표시 개수
+            budget_keyword: 예산 관련 키워드 (예: "저렴한 가성비")
 
         Returns:
             Restaurant 리스트 (중복 제거, 거리순 정렬)
@@ -195,7 +201,7 @@ class RestaurantSearcher:
         seen_names: set[str] = set()
 
         for area in SEARCH_AREAS:
-            items = self._search_single_area(area, cuisine_keyword)
+            items = self._search_single_area(area, cuisine_keyword, budget_keyword)
             for item in items:
                 name = _clean_html(item.get("title", ""))
                 if name and name not in seen_names:

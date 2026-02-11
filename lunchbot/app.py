@@ -82,6 +82,7 @@ tab_search, tab_history = st.tabs(["🔍 맛집 검색", "📜 검색 이력"])
 def _run_search(form_data: dict) -> None:
     """검색을 실행하고 결과를 세션에 저장합니다."""
     import random
+    from app_config.settings import BUDGET_KEYWORDS
 
     with st.spinner("🔍 맛집을 검색하고 있습니다..."):
         try:
@@ -93,10 +94,13 @@ def _run_search(form_data: dict) -> None:
                 center_lng=coords["lng"],
             )
 
+            budget_kw = BUDGET_KEYWORDS.get(form_data.get("budget", "상관없음"), "")
+
             results = searcher.search(
                 area_name=form_data["area"],
                 cuisine_keyword=form_data["cuisine_keyword"],
                 radius=form_data["radius"],
+                budget_keyword=budget_kw,
             )
 
             # 결과가 없으면 자동 반경 확대

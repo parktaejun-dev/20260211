@@ -15,11 +15,18 @@ def render_search_results(
     검색 결과를 표시하고 사용자가 선택한 식당을 반환합니다.
     """
     cuisine = input_data["cuisine"]
-    area = input_data["area"]
     radius = input_data["radius"]
     radius_text = f"{radius}m" if radius < 1000 else f"{radius / 1000:.0f}km"
+    budget = input_data.get("budget", "상관없음")
+    party = input_data["party_size"]
+    date_str = format_date_korean(input_data["date"])
+    time_str = input_data["time"]
 
-    st.subheader(f"🔍 검색 결과 ({cuisine} / {area} {radius_text})")
+    st.subheader(f"🔍 검색 결과")
+    st.caption(
+        f"🍽️ {cuisine} · 💰 {budget} · 👥 {party}명 · "
+        f"📅 {date_str} {time_str} · 📍 반경 {radius_text}"
+    )
 
     if not restaurants:
         st.warning("검색 결과가 없습니다. 반경을 넓히거나 다른 조건을 선택해보세요.")
