@@ -21,7 +21,7 @@ from core.search import RestaurantSearcher
 from core.notification import SlackNotifier
 from ui.styles import CUSTOM_CSS
 from ui.components import render_header
-from ui.pages.home import render_input_form, render_sidebar
+from ui.pages.home import render_input_form
 from ui.pages.search_results import render_search_results
 from ui.pages.history import render_history_page, save_search_result
 from utils.date_helper import format_date_korean
@@ -32,11 +32,37 @@ st.set_page_config(
     page_title="KOBACO 부서점심 자동예약",
     page_icon="🍽️",
     layout="centered",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 # 커스텀 CSS 적용
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+
+
+# ── Secrets에서 API 키 로드 ───────────────────────────────
+def _get_secret(key: str, default: str = "") -> str:
+    """st.secrets에서 값을 안전하게 읽습니다."""
+    try:
+        return st.secrets[key]
+    except (KeyError, FileNotFoundError):
+        return default
+
+
+NAVER_CLIENT_ID = _get_secret("NAVER_CLIENT_ID")
+NAVER_CLIENT_SECRET = _get_secret("NAVER_CLIENT_SECRET")
+SLACK_WEBHOOK_URL = _get_secret("SLACK_WEBHOOK_URL")
+
+if not NAVER_CLIENT_ID or not NAVER_CLIENT_SECRET:
+    st.error(
+        "⚠️ 네이버 API 키가 설정되지 않았습니다.\n\n"
+        "**Streamlit Cloud**: Settings → Secrets 에 아래 내용을 추가하세요.\n\n"
+        "```toml\n"
+        'NAVER_CLIENT_ID = "your_client_id"\n'
+        'NAVER_CLIENT_SECRET = "your_client_secret"\n'
+        "```\n\n"
+        "**로컬 실행**: `.streamlit/secrets.toml` 파일을 생성하세요."
+    )
+    st.stop()
 
 
 # ── 세션 상태 초기화 ──────────────────────────────────────
@@ -44,10 +70,6 @@ if SESSION_KEY_SEARCH_RESULTS not in st.session_state:
     st.session_state[SESSION_KEY_SEARCH_RESULTS] = None
 if SESSION_KEY_INPUT_DATA not in st.session_state:
     st.session_state[SESSION_KEY_INPUT_DATA] = None
-
-
-# ── 사이드바: API 설정 ────────────────────────────────────
-sidebar_info = render_sidebar()
 
 
 # ── 메인 영역 ────────────────────────────────────────────
@@ -65,18 +87,13 @@ with tab_search:
         form_data = render_input_form()
 
         if form_data:
-            # API 키 검증
-            if not sidebar_info["client_id"] or not sidebar_info["client_secret"]:
-                st.error("⚠️ 사이드바에서 네이버 API 키를 입력해주세요.")
-                st.stop()
-
             # 검색 실행
             with st.spinner("🔍 맛집을 검색하고 있습니다..."):
                 try:
                     coords = form_data["area_coords"]
                     searcher = RestaurantSearcher(
-                        client_id=sidebar_info["client_id"],
-                        client_secret=sidebar_info["client_secret"],
+                        client_id=NAVER_CLIENT_ID,
+                        client_secret=NAVER_CLIENT_SECRET,
                         center_lat=coords["lat"],
                         center_lng=coords["lng"],
                     )
@@ -126,9 +143,8 @@ with tab_search:
             )
 
             # Slack 알림
-            slack_url = sidebar_info.get("slack_webhook")
-            if slack_url:
-                notifier = SlackNotifier(slack_url)
+            if SLACK_WEBHOOK_URL:
+                notifier = SlackNotifier(SLACK_WEBHOOK_URL)
                 notifier.send_search_result(
                     restaurant_name=selected.name,
                     address=selected.road_address or selected.address,

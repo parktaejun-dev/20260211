@@ -6,8 +6,9 @@ dist/
 build/
 .eggs/
 
-# 환경 변수
+# 환경 변수 / Secrets
 .env
+.streamlit/secrets.toml
 
 # 데이터
 data/history.db
