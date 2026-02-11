@@ -43,6 +43,12 @@ def render_restaurant_card(restaurant: Restaurant, index: int):
             if restaurant.phone:
                 st.caption(f"📞 {restaurant.phone}")
 
+            if restaurant.blog_reviews:
+                st.caption("📝 블로그 리뷰")
+                for review in restaurant.blog_reviews[:3]:
+                    if review.link:
+                        st.markdown(f"- [{review.title}]({review.link})")
+
         with col2:
             if restaurant.link:
                 st.link_button("🔗 상세보기", restaurant.link, use_container_width=True)

@@ -5,12 +5,22 @@ https://developers.naver.com/docs/serviceapi/search/local/local.md
 """
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from urllib.parse import quote
 
 import httpx
 
-from config.settings import NAVER_SEARCH_API_URL, AREA_CENTER
+from config.settings import NAVER_SEARCH_API_URL, NAVER_BLOG_SEARCH_API_URL, AREA_CENTER
 from utils.geo import haversine_distance, format_distance, estimate_walking_time
+
+
+@dataclass
+class BlogReview:
+    """블로그 리뷰 요약 데이터 클래스."""
+
+    title: str
+    link: str
+    snippet: str = ""
 
 
 @dataclass
@@ -30,6 +40,7 @@ class Restaurant:
     distance_m: float = 0.0
     distance_text: str = ""
     walking_time: str = ""
+    blog_reviews: list[BlogReview] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -45,6 +56,10 @@ class Restaurant:
             "distance_m": self.distance_m,
             "distance_text": self.distance_text,
             "walking_time": self.walking_time,
+            "blog_reviews": [
+                {"title": r.title, "link": r.link, "snippet": r.snippet}
+                for r in self.blog_reviews
+            ],
         }
 
 
@@ -88,6 +103,49 @@ class RestaurantSearcher:
         self.center_lat = center_lat or AREA_CENTER["lat"]
         self.center_lng = center_lng or AREA_CENTER["lng"]
 
+    @property
+    def _api_headers(self) -> dict[str, str]:
+        return {
+            "X-Naver-Client-Id": self.client_id,
+            "X-Naver-Client-Secret": self.client_secret,
+        }
+
+    def _fetch_blog_reviews(
+        self,
+        area_name: str,
+        restaurant_name: str,
+        review_count: int = 3,
+    ) -> list[BlogReview]:
+        """식당 블로그 리뷰를 가져옵니다."""
+        try:
+            response = httpx.get(
+                NAVER_BLOG_SEARCH_API_URL,
+                params={
+                    "query": f"{area_name} {restaurant_name} 후기",
+                    "display": review_count,
+                    "start": 1,
+                    "sort": "sim",
+                },
+                headers=self._api_headers,
+                timeout=10,
+            )
+            response.raise_for_status()
+            items = response.json().get("items", [])
+        except (httpx.HTTPError, ValueError):
+            return []
+
+        reviews: list[BlogReview] = []
+        for item in items:
+            reviews.append(
+                BlogReview(
+                    title=_clean_html(item.get("title", "")),
+                    link=item.get("link", ""),
+                    snippet=_clean_html(item.get("description", "")),
+                )
+            )
+
+        return reviews
+
     def search(
         self,
         area_name: str,
@@ -118,10 +176,7 @@ class RestaurantSearcher:
                     "start": 1,
                     "sort": "comment",  # 리뷰 많은 순
                 },
-                headers={
-                    "X-Naver-Client-Id": self.client_id,
-                    "X-Naver-Client-Secret": self.client_secret,
-                },
+                headers=self._api_headers,
                 timeout=10,
             )
             response.raise_for_status()
@@ -136,7 +191,6 @@ class RestaurantSearcher:
         for item in data.get("items", []):
             lat, lng = self.center_lat, self.center_lng
             distance = 0.0
-
             try:
                 mapx = int(item.get("mapx", 0))
                 mapy = int(item.get("mapy", 0))
@@ -164,11 +218,12 @@ class RestaurantSearcher:
                 walking_time=estimate_walking_time(distance),
             )
 
-            # 네이버 지도 링크 생성
-            if restaurant.road_address:
-                restaurant.map_url = (
-                    f"https://map.naver.com/v5/search/{restaurant.name} {restaurant.road_address}"
-                )
+            # 네이버 지도 링크는 상호명만 사용
+            if restaurant.name:
+                restaurant.map_url = f"https://map.naver.com/v5/search/{quote(restaurant.name)}"
+
+            # 블로그 리뷰 일부를 함께 노출
+            restaurant.blog_reviews = self._fetch_blog_reviews(area_name, restaurant.name)
 
             restaurants.append(restaurant)
 

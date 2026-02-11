@@ -57,6 +57,7 @@ DEFAULT_PARTY_SIZE = 12
 
 # 네이버 API
 NAVER_SEARCH_API_URL = "https://openapi.naver.com/v1/search/local.json"
+NAVER_BLOG_SEARCH_API_URL = "https://openapi.naver.com/v1/search/blog.json"
 NAVER_PLACE_URL = "https://map.naver.com/v5/entry/place"
 NAVER_BOOKING_BASE_URL = "https://booking.naver.com"
 
