@@ -27,10 +27,6 @@ def _install_playwright_browser():
         check=True,
         capture_output=True,
     )
-    subprocess.run(
-        [sys.executable, "-m", "playwright", "install-deps", "chromium"],
-        capture_output=True,
-    )
 
 
 try:
