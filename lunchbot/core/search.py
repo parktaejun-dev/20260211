@@ -172,7 +172,7 @@ class RestaurantSearcher:
                 NAVER_SEARCH_API_URL,
                 params={
                     "query": query,
-                    "display": min(display, 5),
+                    "display": min(display, 10),
                     "start": 1,
                     "sort": "comment",  # 리뷰 많은 순
                 },
