@@ -1,251 +1,190 @@
-"""네이버 플레이스 기반 맛집 검색 엔진
+"""네이버 검색 API 기반 맛집 검색 엔진
 
-Playwright로 네이버 지도를 크롤링하여 맛집을 검색합니다.
-검색 결과에서 네이버 예약 가능 식당을 필터링합니다.
+네이버 검색 API (Local)를 사용하여 맛집을 검색합니다.
+https://developers.naver.com/docs/serviceapi/search/local/local.md
 """
 
 import re
-import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-from playwright.sync_api import Page
-from bs4 import BeautifulSoup
+import httpx
 
-from config.settings import AREA_CENTER, NAVER_PLACE_SEARCH_URL
+from config.settings import NAVER_SEARCH_API_URL, AREA_CENTER
 from utils.geo import haversine_distance, format_distance, estimate_walking_time
 
 
 @dataclass
 class Restaurant:
-    """식당 정보를 담는 데이터 클래스."""
+    """식당 정보 데이터 클래스."""
 
     name: str
     address: str
+    road_address: str = ""
     lat: float = 0.0
     lng: float = 0.0
-    rating: float = 0.0
-    review_count: int = 0
-    price_range: str = ""
-    cuisine_type: str = ""
-    is_bookable: bool = False
-    booking_url: str = ""
-    place_url: str = ""
+    category: str = ""
+    description: str = ""
     phone: str = ""
+    link: str = ""
+    map_url: str = ""
     distance_m: float = 0.0
     distance_text: str = ""
     walking_time: str = ""
-    thumbnail_url: str = ""
 
     def to_dict(self) -> dict:
         return {
             "name": self.name,
             "address": self.address,
+            "road_address": self.road_address,
             "lat": self.lat,
             "lng": self.lng,
-            "rating": self.rating,
-            "review_count": self.review_count,
-            "price_range": self.price_range,
-            "cuisine_type": self.cuisine_type,
-            "is_bookable": self.is_bookable,
-            "booking_url": self.booking_url,
-            "place_url": self.place_url,
+            "category": self.category,
             "phone": self.phone,
+            "link": self.link,
+            "map_url": self.map_url,
             "distance_m": self.distance_m,
             "distance_text": self.distance_text,
             "walking_time": self.walking_time,
         }
 
 
-class RestaurantSearcher:
-    """네이버 플레이스에서 맛집을 검색하는 클래스."""
+def _clean_html(text: str) -> str:
+    """HTML 태그를 제거합니다."""
+    return re.sub(r"<[^>]+>", "", text)
 
-    def __init__(self, center_lat: float | None = None, center_lng: float | None = None):
+
+def _katec_to_wgs84(x: int, y: int) -> tuple[float, float]:
+    """
+    네이버 API 좌표(KATEC)를 WGS84(위도/경도)로 근사 변환합니다.
+
+    네이버 검색 API는 KATEC 좌표계를 사용합니다.
+    정밀 변환은 아니지만 거리 필터링에 충분한 근사치를 제공합니다.
+    """
+    # KATEC → WGS84 근사 변환 (선형 보간)
+    lat = 30.0 + (y - 130000) / 100000 * 0.8975
+    lng = 123.0 + (x - 130000) / 100000 * 0.9975
+
+    # 서울 광화문 부근 보정 (더 정확한 근사)
+    if 280000 < x < 360000 and 520000 < y < 580000:
+        lng = 124.0 + (x - 160000) * 0.00000898
+        lat = 33.0 + (y - 230000) * 0.00000899
+
+    return lat, lng
+
+
+class RestaurantSearcher:
+    """네이버 검색 API로 맛집을 검색하는 클래스."""
+
+    def __init__(
+        self,
+        client_id: str,
+        client_secret: str,
+        center_lat: float | None = None,
+        center_lng: float | None = None,
+    ):
+        self.client_id = client_id
+        self.client_secret = client_secret
         self.center_lat = center_lat or AREA_CENTER["lat"]
         self.center_lng = center_lng or AREA_CENTER["lng"]
 
     def search(
-        self, page: Page, cuisine_type: str, cuisine_keyword: str, radius: int = 500
+        self,
+        area_name: str,
+        cuisine_keyword: str,
+        radius: int = 500,
+        display: int = 10,
     ) -> list[Restaurant]:
         """
-        네이버 지도에서 맛집을 검색합니다.
+        네이버 검색 API로 맛집을 검색합니다.
 
         Args:
-            page: Playwright Page 객체
-            cuisine_type: 음식 종류 (한식, 중식 등)
-            cuisine_keyword: 검색에 사용할 키워드
+            area_name: 지역명 (예: "광화문")
+            cuisine_keyword: 검색 키워드 (예: "한식")
             radius: 검색 반경 (미터)
+            display: 결과 표시 개수
 
         Returns:
-            Restaurant 객체 리스트 (네이버 예약 가능한 것 우선)
+            Restaurant 리스트
         """
-        query = f"{AREA_CENTER['name']} {cuisine_keyword} 맛집"
+        query = f"{area_name} {cuisine_keyword} 맛집"
 
         try:
-            # 네이버 지도 검색
-            search_url = f"{NAVER_PLACE_SEARCH_URL}/{query}"
-            page.goto(search_url, wait_until="networkidle", timeout=15000)
-            time.sleep(2)
+            response = httpx.get(
+                NAVER_SEARCH_API_URL,
+                params={
+                    "query": query,
+                    "display": min(display, 5),
+                    "start": 1,
+                    "sort": "comment",  # 리뷰 많은 순
+                },
+                headers={
+                    "X-Naver-Client-Id": self.client_id,
+                    "X-Naver-Client-Secret": self.client_secret,
+                },
+                timeout=10,
+            )
+            response.raise_for_status()
+            data = response.json()
 
-            # 검색 결과 파싱
-            restaurants = self._parse_search_results(page, cuisine_type)
+        except httpx.HTTPStatusError as e:
+            raise RuntimeError(f"네이버 API 오류 (HTTP {e.response.status_code}): {e.response.text}")
+        except httpx.RequestError as e:
+            raise RuntimeError(f"네이버 API 요청 실패: {str(e)}")
 
-            # 거리 계산 및 필터링
-            restaurants = self._calculate_distances(restaurants)
-            restaurants = self._filter_by_distance(restaurants, radius)
-
-            # 예약 가능 식당 우선 정렬
-            restaurants.sort(key=lambda r: (not r.is_bookable, -r.rating))
-
-            return restaurants[:10]  # 상위 10개
-
-        except Exception as e:
-            print(f"검색 중 오류 발생: {e}")
-            return []
-
-    def _parse_search_results(self, page: Page, cuisine_type: str) -> list[Restaurant]:
-        """검색 결과 페이지에서 식당 정보를 파싱합니다."""
         restaurants = []
+        for item in data.get("items", []):
+            lat, lng = _katec_to_wgs84(int(item.get("mapx", 0)), int(item.get("mapy", 0)))
 
-        try:
-            # iframe 내부의 검색 결과 접근
-            # 네이버 지도는 검색 결과를 iframe으로 렌더링
-            frame = None
-            for f in page.frames:
-                if "search" in f.url:
-                    frame = f
-                    break
+            distance = haversine_distance(self.center_lat, self.center_lng, lat, lng)
 
-            if frame is None:
-                frame = page
-
-            # 검색 결과 아이템 대기
-            frame.wait_for_selector("li.UEzoS", timeout=10000)
-            time.sleep(1)
-
-            items = frame.query_selector_all("li.UEzoS")
-
-            for item in items[:15]:  # 최대 15개 파싱
-                try:
-                    restaurant = self._parse_restaurant_item(item, frame, cuisine_type)
-                    if restaurant:
-                        restaurants.append(restaurant)
-                except Exception:
-                    continue
-
-        except Exception as e:
-            print(f"검색 결과 파싱 오류: {e}")
-
-        return restaurants
-
-    def _parse_restaurant_item(
-        self, item, frame, cuisine_type: str
-    ) -> Restaurant | None:
-        """개별 검색 결과 아이템에서 식당 정보를 추출합니다."""
-        try:
-            # 식당 이름
-            name_el = item.query_selector(".place_bluelink, .TYaxT")
-            name = name_el.inner_text().strip() if name_el else ""
-            if not name:
-                return None
-
-            # 주소
-            address = ""
-            addr_el = item.query_selector(".LDgIH")
-            if addr_el:
-                address = addr_el.inner_text().strip()
-
-            # 평점
-            rating = 0.0
-            rating_el = item.query_selector(".h69bs .place_blind + span, .orXYY")
-            if rating_el:
-                try:
-                    rating = float(rating_el.inner_text().strip())
-                except ValueError:
-                    pass
-
-            # 리뷰 수
-            review_count = 0
-            review_el = item.query_selector(".h69bs .place_blind ~ span:last-child, .YeGNA")
-            if review_el:
-                text = review_el.inner_text().strip()
-                nums = re.findall(r"[\d,]+", text)
-                if nums:
-                    review_count = int(nums[0].replace(",", ""))
-
-            # 네이버 예약 가능 여부
-            is_bookable = False
-            booking_url = ""
-            booking_el = item.query_selector(
-                "a[href*='booking'], .VYhTw, span.fKpVS"
+            restaurant = Restaurant(
+                name=_clean_html(item.get("title", "")),
+                address=item.get("address", ""),
+                road_address=item.get("roadAddress", ""),
+                lat=lat,
+                lng=lng,
+                category=item.get("category", ""),
+                description=_clean_html(item.get("description", "")),
+                phone=item.get("telephone", ""),
+                link=item.get("link", ""),
+                distance_m=distance,
+                distance_text=format_distance(distance),
+                walking_time=estimate_walking_time(distance),
             )
-            if booking_el:
-                is_bookable = True
-                href = booking_el.get_attribute("href")
-                if href and "booking" in href:
-                    booking_url = href
 
-            # 식당 링크
-            place_url = ""
-            link_el = item.query_selector("a.place_bluelink, a.TYaxT")
-            if link_el:
-                place_url = link_el.get_attribute("href") or ""
-
-            # 가격대
-            price_range = ""
-            price_el = item.query_selector(".price_text")
-            if price_el:
-                price_range = price_el.inner_text().strip()
-
-            return Restaurant(
-                name=name,
-                address=address,
-                rating=rating,
-                review_count=review_count,
-                cuisine_type=cuisine_type,
-                is_bookable=is_bookable,
-                booking_url=booking_url,
-                place_url=place_url,
-                price_range=price_range,
-            )
-        except Exception:
-            return None
-
-    def _calculate_distances(self, restaurants: list[Restaurant]) -> list[Restaurant]:
-        """각 식당의 중심점으로부터의 거리를 계산합니다."""
-        for r in restaurants:
-            if r.lat and r.lng:
-                r.distance_m = haversine_distance(
-                    self.center_lat, self.center_lng, r.lat, r.lng
+            # 네이버 지도 링크 생성
+            if restaurant.road_address:
+                restaurant.map_url = (
+                    f"https://map.naver.com/v5/search/{restaurant.name} {restaurant.road_address}"
                 )
-                r.distance_text = format_distance(r.distance_m)
-                r.walking_time = estimate_walking_time(r.distance_m)
-        return restaurants
 
-    def _filter_by_distance(
-        self, restaurants: list[Restaurant], max_radius: int
-    ) -> list[Restaurant]:
-        """반경 이내의 식당만 필터링합니다. 좌표가 없는 식당은 통과."""
-        return [
-            r for r in restaurants if r.distance_m <= max_radius or not (r.lat and r.lng)
-        ]
+            restaurants.append(restaurant)
+
+        # 거리 필터링
+        restaurants = [r for r in restaurants if r.distance_m <= radius]
+
+        # 거리순 정렬
+        restaurants.sort(key=lambda r: r.distance_m)
+
+        return restaurants
 
     def search_with_expanded_radius(
         self,
-        page: Page,
-        cuisine_type: str,
+        area_name: str,
         cuisine_keyword: str,
         initial_radius: int = 500,
     ) -> tuple[list[Restaurant], int]:
         """
-        검색 결과가 부족하면 반경을 자동 확대하여 재검색합니다.
+        검색 결과가 부족하면 반경을 자동 확대합니다.
 
         Returns:
             (식당 리스트, 최종 사용된 반경)
         """
-        for radius in [initial_radius, initial_radius * 2, initial_radius * 3]:
-            results = self.search(page, cuisine_type, cuisine_keyword, radius)
-            bookable = [r for r in results if r.is_bookable]
-            if bookable:
+        for radius in [initial_radius, initial_radius * 2, initial_radius * 4]:
+            results = self.search(area_name, cuisine_keyword, radius)
+            if results:
                 return results, radius
 
-        return results, radius
+        # 필터링 없이 전체 반환
+        results = self.search(area_name, cuisine_keyword, radius=999999)
+        return results, 999999

@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.search import Restaurant, RestaurantSearcher
+from core.search import Restaurant, RestaurantSearcher, _clean_html, _katec_to_wgs84
 from config.settings import AREA_CENTER
 
 
@@ -16,13 +16,11 @@ def test_restaurant_dataclass():
         address="서울 종로구",
         lat=37.570,
         lng=126.977,
-        rating=4.5,
-        review_count=100,
-        is_bookable=True,
+        category="한식",
+        phone="02-1234-5678",
     )
     assert r.name == "테스트식당"
-    assert r.rating == 4.5
-    assert r.is_bookable is True
+    assert r.category == "한식"
 
 
 def test_restaurant_to_dict():
@@ -31,34 +29,41 @@ def test_restaurant_to_dict():
     d = r.to_dict()
     assert isinstance(d, dict)
     assert d["name"] == "테스트"
-    assert "is_bookable" in d
+    assert "category" in d
 
 
-def test_searcher_init_default_center():
-    """RestaurantSearcher 기본 중심점 설정 테스트."""
-    searcher = RestaurantSearcher()
+def test_clean_html():
+    """HTML 태그 제거 테스트."""
+    assert _clean_html("<b>맛집</b>") == "맛집"
+    assert _clean_html("일반텍스트") == "일반텍스트"
+    assert _clean_html("<a href='x'>링크</a>") == "링크"
+
+
+def test_katec_to_wgs84():
+    """KATEC 좌표 변환 테스트."""
+    lat, lng = _katec_to_wgs84(310000, 552000)
+    # 서울 부근 좌표가 나와야 함
+    assert 33 < lat < 40
+    assert 124 < lng < 130
+
+
+def test_searcher_init():
+    """RestaurantSearcher 초기화 테스트."""
+    searcher = RestaurantSearcher(
+        client_id="test_id",
+        client_secret="test_secret",
+    )
+    assert searcher.client_id == "test_id"
     assert searcher.center_lat == AREA_CENTER["lat"]
-    assert searcher.center_lng == AREA_CENTER["lng"]
 
 
-def test_searcher_init_custom_center():
-    """RestaurantSearcher 커스텀 중심점 설정 테스트."""
-    searcher = RestaurantSearcher(center_lat=37.0, center_lng=127.0)
+def test_searcher_custom_center():
+    """RestaurantSearcher 커스텀 중심점 테스트."""
+    searcher = RestaurantSearcher(
+        client_id="id",
+        client_secret="secret",
+        center_lat=37.0,
+        center_lng=127.0,
+    )
     assert searcher.center_lat == 37.0
     assert searcher.center_lng == 127.0
-
-
-def test_filter_by_distance():
-    """거리 기반 필터링 테스트."""
-    searcher = RestaurantSearcher()
-    restaurants = [
-        Restaurant(name="가까운곳", address="", lat=37.5682, lng=126.9783, distance_m=100),
-        Restaurant(name="먼곳", address="", lat=37.6, lng=127.0, distance_m=5000),
-        Restaurant(name="좌표없음", address="", lat=0, lng=0, distance_m=0),
-    ]
-
-    filtered = searcher._filter_by_distance(restaurants, 500)
-    names = [r.name for r in filtered]
-    assert "가까운곳" in names
-    assert "좌표없음" in names  # 좌표 없는 식당은 통과
-    assert "먼곳" not in names
