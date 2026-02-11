@@ -10,7 +10,7 @@ from urllib.parse import quote
 
 import httpx
 
-from config.settings import NAVER_SEARCH_API_URL, NAVER_BLOG_SEARCH_API_URL, AREA_CENTER
+from app_config.settings import NAVER_SEARCH_API_URL, NAVER_BLOG_SEARCH_API_URL, AREA_CENTER
 from utils.geo import haversine_distance, format_distance, estimate_walking_time
 
 

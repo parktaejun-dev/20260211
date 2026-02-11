@@ -9,7 +9,7 @@ from pathlib import Path
 from datetime import datetime
 from dataclasses import dataclass
 
-from config.settings import HISTORY_DB_PATH
+from app_config.settings import HISTORY_DB_PATH
 
 
 @dataclass

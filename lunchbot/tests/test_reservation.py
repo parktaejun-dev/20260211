@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # 테스트용 DB 경로 설정
-import config.settings as settings
+import app_config.settings as settings
 
 TEST_DB = "/tmp/test_lunchbot_history.db"
 settings.HISTORY_DB_PATH = TEST_DB

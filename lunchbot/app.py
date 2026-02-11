@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import streamlit as st
 
-from config.constants import SESSION_KEY_SEARCH_RESULTS, SESSION_KEY_INPUT_DATA
+from app_config.constants import SESSION_KEY_SEARCH_RESULTS, SESSION_KEY_INPUT_DATA
 from core.search import RestaurantSearcher
 from core.notification import SlackNotifier
 from ui.styles import CUSTOM_CSS

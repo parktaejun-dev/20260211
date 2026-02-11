@@ -3,7 +3,7 @@
 import streamlit as st
 from datetime import date
 
-from config.settings import (
+from app_config.settings import (
     AREA_OPTIONS,
     CUISINE_TYPES,
     BUDGET_OPTIONS,

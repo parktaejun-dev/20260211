@@ -7,7 +7,7 @@ from pathlib import Path
 # 프로젝트 루트 경로 추가
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from config.settings import DEFAULT_PARTY_SIZE, AREA_OPTIONS
+from app_config.settings import DEFAULT_PARTY_SIZE, AREA_OPTIONS
 from core.db import DatabaseManager
 
 
