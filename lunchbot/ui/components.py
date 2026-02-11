@@ -1,15 +1,22 @@
 """Streamlit UI 공통 컴포넌트"""
 
+from pathlib import Path
+
 import streamlit as st
 
 from core.search import Restaurant
+
+# 로고 절대 경로 (Streamlit Cloud 호환)
+_APP_DIR = Path(__file__).resolve().parent.parent
+_LOGO_PATH = _APP_DIR / "assets" / "kobaco_logo.png"
 
 
 def render_header():
     """KOBACO 로고와 앱 헤더를 렌더링합니다."""
     col_logo, col_title = st.columns([1, 4])
     with col_logo:
-        st.image("assets/kobaco_logo.png", width=80)
+        if _LOGO_PATH.exists():
+            st.image(str(_LOGO_PATH), width=80)
     with col_title:
         st.markdown("## 부서점심 자동예약")
         st.caption("음식 종류 / 지역 / 예산 / 인원만 선택하면 맛집을 찾아드립니다!")
