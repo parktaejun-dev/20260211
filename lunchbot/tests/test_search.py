@@ -5,7 +5,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.search import Restaurant, RestaurantSearcher, _clean_html, _katec_to_wgs84
+from core.search import (
+    Restaurant,
+    RestaurantSearcher,
+    _clean_html,
+    _is_reasonable_korea_coordinate,
+    _katec_to_wgs84,
+)
 from config.settings import AREA_CENTER
 
 
@@ -86,6 +92,61 @@ def test_search_with_invalid_map_coordinates(monkeypatch):
 
     assert len(results) == 1
     assert results[0].name == "테스트 식당"
+
+
+def test_reasonable_korea_coordinate():
+    """좌표 유효성 판별 테스트."""
+    assert _is_reasonable_korea_coordinate(37.56, 126.97) is True
+    assert _is_reasonable_korea_coordinate(10.0, 126.97) is False
+
+
+def test_search_fallback_when_all_filtered_out(monkeypatch):
+    """거리 필터에서 전부 탈락해도 원본 결과를 반환해야 한다."""
+
+    class MockResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "items": [
+                    {
+                        "title": "<b>테스트 식당A</b>",
+                        "address": "서울 종로구",
+                        "roadAddress": "서울 종로구 세종대로",
+                        "mapx": "800000",
+                        "mapy": "900000",
+                        "category": "한식",
+                        "description": "<b>맛집</b>",
+                    },
+                    {
+                        "title": "<b>테스트 식당B</b>",
+                        "address": "서울 종로구",
+                        "roadAddress": "서울 종로구 세종대로",
+                        "mapx": "810000",
+                        "mapy": "910000",
+                        "category": "한식",
+                        "description": "<b>맛집</b>",
+                    },
+                ]
+            }
+
+    def mock_get(*args, **kwargs):
+        return MockResponse()
+
+    monkeypatch.setattr("core.search.httpx.get", mock_get)
+
+    searcher = RestaurantSearcher(
+        client_id="id",
+        client_secret="secret",
+        center_lat=37.5682,
+        center_lng=126.9783,
+    )
+
+    # 아주 작은 반경으로 필터링을 강제해도 결과 자체는 반환되어야 함
+    results = searcher.search("광화문", "한식", radius=10)
+
+    assert len(results) == 2
 
 
 def test_searcher_init():
