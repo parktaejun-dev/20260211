@@ -10,7 +10,7 @@ from urllib.parse import quote
 
 import httpx
 
-from app_config.settings import NAVER_SEARCH_API_URL, NAVER_BLOG_SEARCH_API_URL, AREA_CENTER
+from app_config.settings import NAVER_SEARCH_API_URL, NAVER_BLOG_SEARCH_API_URL, AREA_CENTER, SEARCH_AREAS
 from utils.geo import haversine_distance, format_distance, estimate_walking_time
 
 
@@ -112,7 +112,6 @@ class RestaurantSearcher:
 
     def _fetch_blog_reviews(
         self,
-        area_name: str,
         restaurant_name: str,
         review_count: int = 3,
     ) -> list[BlogReview]:
@@ -121,7 +120,7 @@ class RestaurantSearcher:
             response = httpx.get(
                 NAVER_BLOG_SEARCH_API_URL,
                 params={
-                    "query": f"{area_name} {restaurant_name} 후기",
+                    "query": f"{restaurant_name} 후기",
                     "display": review_count,
                     "start": 1,
                     "sort": "sim",
@@ -146,6 +145,32 @@ class RestaurantSearcher:
 
         return reviews
 
+    def _search_single_area(
+        self,
+        area_name: str,
+        cuisine_keyword: str,
+        display: int = 5,
+    ) -> list[dict]:
+        """단일 지역으로 네이버 API를 호출, raw items을 반환합니다."""
+        query = f"{area_name} {cuisine_keyword}"
+
+        try:
+            response = httpx.get(
+                NAVER_SEARCH_API_URL,
+                params={
+                    "query": query,
+                    "display": min(display, 5),
+                    "start": 1,
+                    "sort": "comment",
+                },
+                headers=self._api_headers,
+                timeout=10,
+            )
+            response.raise_for_status()
+            return response.json().get("items", [])
+        except (httpx.HTTPError, ValueError):
+            return []
+
     def search(
         self,
         area_name: str,
@@ -154,46 +179,36 @@ class RestaurantSearcher:
         display: int = 10,
     ) -> list[Restaurant]:
         """
-        네이버 검색 API로 맛집을 검색합니다.
+        여러 지역명으로 네이버 검색 API를 호출하고 결과를 병합합니다.
 
         Args:
-            area_name: 지역명 (예: "광화문")
-            cuisine_keyword: 검색 키워드 (예: "한식")
+            area_name: 미사용 (호환성 유지)
+            cuisine_keyword: 검색 키워드 (예: "한식", "맛집")
             radius: 검색 반경 (미터)
             display: 결과 표시 개수
 
         Returns:
-            Restaurant 리스트
+            Restaurant 리스트 (중복 제거, 거리순 정렬)
         """
-        query = f"{area_name} {cuisine_keyword} 맛집"
+        # 여러 지역으로 검색하여 raw items 수집
+        all_items: list[dict] = []
+        seen_names: set[str] = set()
 
-        try:
-            response = httpx.get(
-                NAVER_SEARCH_API_URL,
-                params={
-                    "query": query,
-                    "display": min(display, 10),
-                    "start": 1,
-                    "sort": "comment",  # 리뷰 많은 순
-                },
-                headers=self._api_headers,
-                timeout=10,
-            )
-            response.raise_for_status()
-            data = response.json()
-
-        except httpx.HTTPStatusError as e:
-            raise RuntimeError(f"네이버 API 오류 (HTTP {e.response.status_code}): {e.response.text}")
-        except httpx.RequestError as e:
-            raise RuntimeError(f"네이버 API 요청 실패: {str(e)}")
+        for area in SEARCH_AREAS:
+            items = self._search_single_area(area, cuisine_keyword)
+            for item in items:
+                name = _clean_html(item.get("title", ""))
+                if name and name not in seen_names:
+                    seen_names.add(name)
+                    all_items.append(item)
 
         from core.db import db
-        
+
         restaurants = []
-        for item in data.get("items", []):
+        for item in all_items:
             title = _clean_html(item.get("title", ""))
             address = item.get("address", "")
-            
+
             # 제외된 식당 필터링
             if db.is_excluded(title, address):
                 continue
@@ -209,12 +224,11 @@ class RestaurantSearcher:
                     lat, lng = converted_lat, converted_lng
                     distance = haversine_distance(self.center_lat, self.center_lng, lat, lng)
             except (TypeError, ValueError):
-                # 좌표 파싱 불가 시 거리 정보는 중심 좌표 기준으로 대체
                 pass
 
             restaurant = Restaurant(
-                name=_clean_html(item.get("title", "")),
-                address=item.get("address", ""),
+                name=title,
+                address=address,
                 road_address=item.get("roadAddress", ""),
                 lat=lat,
                 lng=lng,
@@ -227,26 +241,25 @@ class RestaurantSearcher:
                 walking_time=estimate_walking_time(distance),
             )
 
-            # 네이버 지도 링크는 상호명만 사용 (주소 포함 시 검색 실패 사례 방지)
             if restaurant.name:
                 restaurant.map_url = f"https://map.naver.com/v5/search/{quote(restaurant.name)}"
 
-            # 블로그 리뷰 일부를 함께 노출
-            restaurant.blog_reviews = self._fetch_blog_reviews(area_name, restaurant.name)
+            # 블로그 리뷰
+            restaurant.blog_reviews = self._fetch_blog_reviews(restaurant.name)
 
             restaurants.append(restaurant)
 
         # 거리 필터링
-        filtered_restaurants = [r for r in restaurants if r.distance_m <= radius]
+        filtered = [r for r in restaurants if r.distance_m <= radius]
 
-        # TM128 좌표 오차로 전부 탈락하는 경우를 방지하기 위해 원본 결과로 폴백
-        if filtered_restaurants:
-            filtered_restaurants.sort(key=lambda r: r.distance_m)
-            return filtered_restaurants
+        if filtered:
+            filtered.sort(key=lambda r: r.distance_m)
+            return filtered[:display]
 
+        # 폴백: 전부 탈락 시 거리순 전체 반환
         if restaurants:
             restaurants.sort(key=lambda r: r.distance_m)
-            return restaurants
+            return restaurants[:display]
 
         return []
 

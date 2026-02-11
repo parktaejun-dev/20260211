@@ -30,7 +30,7 @@ def render_auto_select_button() -> dict | None:
         return {
             "cuisine": "전체",
             "cuisine_keyword": "맛집",  # 전체 음식 종류
-            "area": AREA_CENTER["search_name"],
+            "area": AREA_CENTER["name"],
             "area_coords": {"lat": AREA_CENTER["lat"], "lng": AREA_CENTER["lng"]},
             "radius": DEFAULT_RADIUS,
             "budget": "상관없음",
@@ -123,7 +123,7 @@ def render_input_form() -> dict | None:
             return {
                 "cuisine": cuisine,
                 "cuisine_keyword": CUISINE_TYPES[cuisine],
-                "area": AREA_CENTER["search_name"],
+                "area": AREA_CENTER["name"],
                 "area_coords": {"lat": AREA_CENTER["lat"], "lng": AREA_CENTER["lng"]},
                 "radius": radius,
                 "budget": budget,
