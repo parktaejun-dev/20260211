@@ -200,13 +200,17 @@ class RestaurantSearcher:
         all_items: list[dict] = []
         seen_names: set[str] = set()
 
+        # "양식 파스타 스테이크" 처럼 공백으로 구분된 키워드를 분리하여 각각 검색
+        keywords = cuisine_keyword.split()
+
         for area in SEARCH_AREAS:
-            items = self._search_single_area(area, cuisine_keyword, budget_keyword)
-            for item in items:
-                name = _clean_html(item.get("title", ""))
-                if name and name not in seen_names:
-                    seen_names.add(name)
-                    all_items.append(item)
+            for kw in keywords:
+                items = self._search_single_area(area, kw, budget_keyword)
+                for item in items:
+                    name = _clean_html(item.get("title", ""))
+                    if name and name not in seen_names:
+                        seen_names.add(name)
+                        all_items.append(item)
 
         from core.db import db
 
