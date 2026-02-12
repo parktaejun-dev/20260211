@@ -32,7 +32,7 @@ from core.search import RestaurantSearcher, Restaurant
 
 # ── 페이지 설정 ──────────────────────────────────────────
 st.set_page_config(
-    page_title="KOBACO 부서점심 자동예약",
+    page_title="무교동미슐랭",
     page_icon="🍽️",
     layout="centered",
     initial_sidebar_state="collapsed",

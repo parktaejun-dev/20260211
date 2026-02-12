@@ -29,8 +29,8 @@ def render_header():
                 unsafe_allow_html=True
             )
     with col_title:
-        st.markdown("## 부서점심 자동예약")
-        st.caption("음식 종류 / 지역 / 예산 / 인원만 선택하면 맛집을 찾아드립니다!")
+        st.markdown("## 무교동미슐랭")
+        st.caption("여러분의 즐겨찾기 추가와, 제외로 좀 더 나은 결과가 나올 것입니다.")
 
 
 def render_restaurant_card(restaurant: Restaurant, index: int):
