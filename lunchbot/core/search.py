@@ -278,7 +278,15 @@ class RestaurantSearcher:
             address = item.get("address", "")
 
             # 제외된 식당 필터링
+            # 제외된 식당 필터링 (사용자 설정)
             if db.is_excluded(title, address):
+                continue
+            
+            # 업종 필터링 (카페, 술집 등 제외)
+            from app_config.settings import EXCLUDED_CATEGORIES
+            category = _clean_html(item.get("category", ""))
+            # 카테고리 문자열에 제외 키워드가 포함되어 있으면 건너뜀
+            if any(exc in category for exc in EXCLUDED_CATEGORIES):
                 continue
 
             lat, lng = self.center_lat, self.center_lng
