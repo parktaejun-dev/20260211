@@ -36,7 +36,7 @@ def render_header():
 def render_restaurant_card(restaurant: Restaurant, index: int):
     """식당 정보를 카드 형태로 표시합니다."""
     with st.container(border=True):
-        col1, col2 = st.columns([3, 1])
+        col1, col2 = st.columns([2.5, 1.5])
 
         with col1:
             st.markdown(f"**{index}. {restaurant.name}**")
@@ -49,6 +49,8 @@ def render_restaurant_card(restaurant: Restaurant, index: int):
                 distance_info = ""
                 if restaurant.walking_time:
                     distance_info = f" | {restaurant.distance_text} ({restaurant.walking_time})"
+                elif restaurant.distance_text:
+                    distance_info = f" | {restaurant.distance_text}"
                 st.caption(f"📍 {address}{distance_info}")
 
             if restaurant.price:
@@ -64,7 +66,29 @@ def render_restaurant_card(restaurant: Restaurant, index: int):
                         st.markdown(f"- [{review.title}]({review.link})")
 
         with col2:
+            # 1. 네이버 지도 버튼
             if restaurant.link:
-                st.link_button("🔗 상세보기", restaurant.link, use_container_width=True)
-            if restaurant.map_url:
-                st.link_button("🗺️ 지도", restaurant.map_url, use_container_width=True)
+                st.link_button("🗺️ 네이버 지도", restaurant.link, use_container_width=True)
+            
+            from core.db import db
+            address_for_db = restaurant.road_address or restaurant.address
+            
+            # 2. 즐겨찾기 버튼
+            if db.is_favorite(restaurant.name, address_for_db):
+                st.button("⭐ 저장됨", disabled=True, key=f"fav_disabled_{index}", use_container_width=True)
+            else:
+                if st.button("⭐ 즐겨찾기", key=f"add_fav_{index}", use_container_width=True):
+                    db.add_favorite(restaurant.name, address_for_db, restaurant.category)
+                    st.toast(f"⭐ {restaurant.name} 즐겨찾기 추가 완료!")
+                    st.rerun()
+
+            # 3. 제외 버튼
+            if st.button("🚫 영구 제외", key=f"exclude_{index}", use_container_width=True):
+                db.add_exclusion(restaurant.name, address_for_db, "검색 결과에서 제외됨")
+                if "search_results" in st.session_state and st.session_state["search_results"]:
+                    st.session_state["search_results"] = [
+                        r for r in st.session_state["search_results"] 
+                        if not (r.name == restaurant.name and (r.road_address or r.address) == address_for_db)
+                    ]
+                st.toast(f"🚫 {restaurant.name} 제외 처리되었습니다.")
+                st.rerun()
