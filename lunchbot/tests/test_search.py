@@ -13,7 +13,7 @@ from core.search import (
     _is_reasonable_korea_coordinate,
     _katec_to_wgs84,
 )
-from app_config.settings import AREA_CENTER, NAVER_BLOG_SEARCH_API_URL, NAVER_SEARCH_API_URL
+from bot_config.settings import AREA_CENTER, NAVER_BLOG_SEARCH_API_URL, NAVER_SEARCH_API_URL
 
 
 def test_restaurant_dataclass():
