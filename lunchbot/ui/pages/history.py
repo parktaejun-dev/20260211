@@ -1,7 +1,7 @@
 """검색 이력 페이지"""
 
 import streamlit as st
-from core.db import db
+from bot_core.db import db
 
 
 def render_history_tab():

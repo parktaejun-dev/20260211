@@ -8,7 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from bot_config.settings import DEFAULT_PARTY_SIZE, AREA_CENTER
-from core.db import DatabaseManager
+from bot_core.db import DatabaseManager
 
 
 def test_default_settings():

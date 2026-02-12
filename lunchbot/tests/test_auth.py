@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.notification import SlackNotifier
+from bot_core.notification import SlackNotifier
 
 
 def test_slack_notifier_init():

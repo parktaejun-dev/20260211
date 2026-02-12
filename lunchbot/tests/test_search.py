@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.search import (
+from bot_core.search import (
     BlogReview,
     Restaurant,
     RestaurantSearcher,
@@ -94,7 +94,7 @@ def test_search_with_invalid_map_coordinates(monkeypatch):
 
         return MockResponse({"items": []})
 
-    monkeypatch.setattr("core.search.httpx.get", mock_get)
+    monkeypatch.setattr("bot_core.search.httpx.get", mock_get)
 
     searcher = RestaurantSearcher(
         client_id="id",
@@ -156,7 +156,7 @@ def test_search_fallback_when_all_filtered_out(monkeypatch):
 
         return MockResponse({"items": []})
 
-    monkeypatch.setattr("core.search.httpx.get", mock_get)
+    monkeypatch.setattr("bot_core.search.httpx.get", mock_get)
 
     searcher = RestaurantSearcher(
         client_id="id",
@@ -222,7 +222,7 @@ def test_map_uses_restaurant_name_only_and_blog_reviews(monkeypatch):
 
         raise AssertionError("unexpected url")
 
-    monkeypatch.setattr("core.search.httpx.get", mock_get)
+    monkeypatch.setattr("bot_core.search.httpx.get", mock_get)
 
     searcher = RestaurantSearcher(
         client_id="id",
@@ -294,7 +294,7 @@ def test_map_url_and_phone_extraction(monkeypatch):
             )
         return MockResponse({"items": []})
 
-    monkeypatch.setattr("core.search.httpx.get", mock_get)
+    monkeypatch.setattr("bot_core.search.httpx.get", mock_get)
 
     searcher = RestaurantSearcher(
         client_id="id",

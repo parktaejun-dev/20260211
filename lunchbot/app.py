@@ -17,8 +17,8 @@ sys.path.insert(0, str(Path(__file__).parent))
 import streamlit as st
 
 from bot_config.constants import SESSION_KEY_SEARCH_RESULTS, SESSION_KEY_INPUT_DATA
-from core.search import RestaurantSearcher
-from core.notification import SlackNotifier
+from bot_core.search import RestaurantSearcher
+from bot_core.notification import SlackNotifier
 from ui.styles import CUSTOM_CSS
 from ui.components import render_header
 from ui.pages.home import render_input_form, render_auto_select_button
@@ -26,8 +26,8 @@ from ui.pages.search_results import render_search_results
 from ui.pages.search_results import render_search_results
 from ui.pages.history import render_history_tab
 from ui.pages.db_management import render_db_management_tab
-from utils.date_helper import format_date_korean
-from core.search import RestaurantSearcher, Restaurant
+from bot_utils.date_helper import format_date_korean
+from bot_core.search import RestaurantSearcher, Restaurant
 
 
 # ── 페이지 설정 ──────────────────────────────────────────
@@ -91,7 +91,7 @@ def _run_search(form_data: dict) -> None:
         try:
             # 1. DB 검색 모드
             if form_data.get("source") == "db":
-                from core.db import db
+                from bot_core.db import db
                 raw_results = db.search_favorites(form_data["query"])
                 results = []
                 for row in raw_results:
@@ -179,7 +179,7 @@ with tab_search:
 
         if selected:
             # 이력 저장
-            from core.db import db
+            from bot_core.db import db
 
             db.save_search_result(
                 restaurant_name=selected.name,

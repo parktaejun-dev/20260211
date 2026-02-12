@@ -14,7 +14,7 @@ from bot_config.settings import (
     MAX_PARTY_SIZE,
     DEFAULT_PARTY_SIZE,
 )
-from utils.date_helper import get_next_monday
+from bot_utils.date_helper import get_next_monday
 
 
 def render_auto_select_button() -> dict | None:

@@ -1,7 +1,7 @@
 
 import pytest
 from unittest.mock import MagicMock, patch
-from core.search import RestaurantSearcher
+from bot_core.search import RestaurantSearcher
 
 def test_search_splits_keywords():
     """검색어가 공백으로 구분된 경우 분리해서 호출하는지 테스트"""
@@ -12,7 +12,7 @@ def test_search_splits_keywords():
     searcher._search_single_area = MagicMock(return_value=[])
     
     # SEARCH_AREAS를 1개로 제한하여 테스트 단순화
-    with patch("core.search.SEARCH_AREAS", ["테스트지역"]):
+    with patch("bot_core.search.SEARCH_AREAS", ["테스트지역"]):
         # when
         searcher.search(
             area_name="무시됨", 

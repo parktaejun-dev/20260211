@@ -4,7 +4,7 @@ from pathlib import Path
 
 import streamlit as st
 
-from core.search import Restaurant
+from bot_core.search import Restaurant
 
 # 로고 절대 경로 (Streamlit Cloud 호환)
 _APP_DIR = Path(__file__).resolve().parent.parent
@@ -85,7 +85,7 @@ def render_restaurant_card(restaurant: Restaurant, index: int):
             if homepage_url:
                 st.link_button("🏠 홈페이지", homepage_url, use_container_width=True)
             
-            from core.db import db
+            from bot_core.db import db
             address_for_db = restaurant.road_address or restaurant.address
             
             # 2. 즐겨찾기 버튼

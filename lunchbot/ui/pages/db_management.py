@@ -2,8 +2,8 @@
 
 import streamlit as st
 import pandas as pd
-from core.db import db
-from utils.parser import parse_uploaded_file, parse_naver_map_url
+from bot_core.db import db
+from bot_utils.parser import parse_uploaded_file, parse_naver_map_url
 
 def render_db_management_tab():
     """DB 관리 탭 (즐겨찾기/제외목록/데이터추가)"""

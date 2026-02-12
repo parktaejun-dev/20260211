@@ -1,8 +1,8 @@
 import pytest
 import sqlite3
 import pandas as pd
-from core.db import DatabaseManager
-from utils.parser import parse_uploaded_file
+from bot_core.db import DatabaseManager
+from bot_utils.parser import parse_uploaded_file
 
 @pytest.fixture
 def test_db(tmp_path):

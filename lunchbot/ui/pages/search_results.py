@@ -2,9 +2,9 @@
 
 import streamlit as st
 
-from core.search import Restaurant
+from bot_core.search import Restaurant
 from ui.components import render_restaurant_card
-from utils.date_helper import format_date_korean
+from bot_utils.date_helper import format_date_korean
 
 
 def render_search_results(
@@ -85,7 +85,7 @@ def render_search_results(
         )
 
         # ── DB 액션 버튼 (즐겨찾기 / 제외) ────────────────
-        from core.db import db
+        from bot_core.db import db
 
         col_act1, col_act2 = st.columns(2)
         

@@ -6,8 +6,8 @@ from datetime import date
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from utils.geo import haversine_distance, is_within_radius, format_distance, estimate_walking_time
-from utils.date_helper import get_next_monday, format_date_korean, format_date_short
+from bot_utils.geo import haversine_distance, is_within_radius, format_distance, estimate_walking_time
+from bot_utils.date_helper import get_next_monday, format_date_korean, format_date_short
 
 
 # ── geo 테스트 ────────────────────────────────────────────
