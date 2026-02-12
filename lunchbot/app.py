@@ -88,6 +88,9 @@ def _run_search(form_data: dict) -> None:
     from bot_config.settings import BUDGET_KEYWORDS
 
     with st.spinner("🔍 맛집을 검색하고 있습니다..."):
+        # 검색 시작 시 이전 랜덤 추천 상태 초기화
+        if "random_picks" in st.session_state:
+            del st.session_state["random_picks"]
         try:
             # 1. DB 검색 모드
             if form_data.get("source") == "db":
@@ -140,9 +143,9 @@ def _run_search(form_data: dict) -> None:
                 if results:
                     st.info("검색 반경을 자동으로 넓혔습니다.")
 
-            # 자동선택 모드: 3개만 랜덤 선정
-            if form_data.get("auto_select") and results and len(results) > 3:
-                results = random.sample(results, 3)
+            # 자동선택 모드: 10개만 랜덤 선정
+            if form_data.get("auto_select") and results and len(results) > 10:
+                results = random.sample(results, 10)
 
             st.session_state[SESSION_KEY_SEARCH_RESULTS] = results
             st.session_state[SESSION_KEY_INPUT_DATA] = form_data
