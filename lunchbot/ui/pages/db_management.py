@@ -37,6 +37,8 @@ def _render_favorites():
         with st.expander(f"⭐ {name}", expanded=False):
             if address:
                 st.caption(f"📍 {address}")
+            if item.get("category"):
+                st.caption(f"📂 {item['category']}")
             if memo:
                  st.caption(f"📝 {memo}")
             
@@ -95,7 +97,22 @@ def _render_data_import():
 
     # 1. 파일 업로드
     st.markdown("### 📂 파일로 추가 (Excel/CSV)")
-    st.caption("컬럼명: `name`(필수), `address`, `memo`")
+    st.caption("컬럼명: `name`(필수), `address`, `memo`, `category`")
+
+    # 예제 파일 다운로드
+    example_data = pd.DataFrame([{
+        "name": "무교동미슐랭",
+        "address": "서울 중구 무교로 123",
+        "memo": "김치찌개 맛집",
+        "category": "한식"
+    }])
+    csv_buffer = example_data.to_csv(index=False).encode('utf-8-sig')
+    st.download_button(
+        label="📥 예제 파일 다운로드 (CSV)",
+        data=csv_buffer,
+        file_name="lunchbot_template.csv",
+        mime="text/csv",
+    )
     
     uploaded_file = st.file_uploader("파일 선택", type=["csv", "xlsx", "xls"])
     if uploaded_file:
@@ -117,8 +134,9 @@ def _render_data_import():
         # URL 파싱 시도
         info = parse_naver_map_url(url)
         if info:
-            st.success(f"식당을 찾았습니다: **{info['name']}**")
-            if db.add_favorite(info["name"], info["address"]):
+            cat_str = f" ({info['category']})" if info.get('category') else ""
+            st.success(f"식당을 찾았습니다: **{info['name']}**{cat_str}")
+            if db.add_favorite(info["name"], info["address"], category=info.get("category", "")):
                 st.toast(f"✅ {info['name']} 추가 완료!")
             else:
                 st.warning("이미 즐겨찾기에 있는 식당입니다.")

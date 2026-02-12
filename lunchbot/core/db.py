@@ -71,6 +71,15 @@ class DatabaseManager:
                 ON favorites (restaurant_name, address)
             """)
 
+            # 2. Add 'category' column if not exists (Migration)
+            cursor.execute("PRAGMA table_info(favorites)")
+            columns = [info[1] for info in cursor.fetchall()]
+            if "category" not in columns:
+                try:
+                    cursor.execute("ALTER TABLE favorites ADD COLUMN category TEXT")
+                except Exception as e:
+                    print(f"[DB Migration Error] {e}")
+
             # 제외 목록 테이블
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS exclusions (
@@ -136,14 +145,14 @@ class DatabaseManager:
             return [dict(row) for row in cursor.fetchall()]
 
     # ─── 즐겨찾기 ────────────────────────────────────────────────
-    def add_favorite(self, name: str, address: str, memo: str = ""):
+    def add_favorite(self, name: str, address: str, memo: str = "", category: str = "") -> bool:
         """즐겨찾기에 추가합니다. 이미 존재하면 무시합니다."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             try:
                 cursor.execute(
-                    "INSERT INTO favorites (restaurant_name, address, memo) VALUES (?, ?, ?)",
-                    (name, address, memo),
+                    "INSERT INTO favorites (restaurant_name, address, memo, category) VALUES (?, ?, ?, ?)",
+                    (name, address, memo, category),
                 )
                 conn.commit()
                 return True
@@ -231,7 +240,7 @@ class DatabaseManager:
     def import_favorites(self, data: list[dict]) -> int:
         """
         딕셔너리 리스트를 즐겨찾기에 일괄 추가합니다.
-        data example: [{'name': '..', 'address': '..', 'memo': '..'}]
+        data example: [{'name': '..', 'address': '..', 'memo': '..', 'category': '..'}]
         Return: 추가된 개수
         """
         count = 0
@@ -240,8 +249,8 @@ class DatabaseManager:
             for item in data:
                 try:
                     cursor.execute(
-                        "INSERT INTO favorites (restaurant_name, address, memo) VALUES (?, ?, ?)",
-                        (item.get("name"), item.get("address", ""), item.get("memo", "")),
+                        "INSERT INTO favorites (restaurant_name, address, memo, category) VALUES (?, ?, ?, ?)",
+                        (item.get("name"), item.get("address", ""), item.get("memo", ""), item.get("category", "")),
                     )
                     count += 1
                 except sqlite3.IntegrityError:
