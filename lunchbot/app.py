@@ -85,7 +85,7 @@ tab_search, tab_history, tab_db = st.tabs(["🔍 맛집 검색", "📜 검색 �
 def _run_search(form_data: dict) -> None:
     """검색을 실행하고 결과를 세션에 저장합니다."""
     import random
-    from app_config.settings import BUDGET_KEYWORDS
+    from bot_config.settings import BUDGET_KEYWORDS
 
     with st.spinner("🔍 맛집을 검색하고 있습니다..."):
         try:
