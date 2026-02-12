@@ -38,6 +38,7 @@ class Restaurant:
     link: str = ""
     map_url: str = ""
     distance_m: float = 0.0
+    price: str = "" # 평균 가격대 (블로그 검색 등으로 추정)
     distance_text: str = ""
     walking_time: str = ""
     blog_reviews: list[BlogReview] = field(default_factory=list)
@@ -144,6 +145,63 @@ class RestaurantSearcher:
             )
 
         return reviews
+
+    def search_blog_for_price(self, restaurant_name: str) -> str:
+        """
+        블로그 검색 API를 이용하여 식당의 메뉴 가격 정보를 추정합니다.
+        
+        Args:
+           restaurant_name: 식당 이름 (예: "명동교자")
+           
+        Returns:
+            str: 추정된 가격 정보 (예: "11,000원") 또는 빈 문자열
+        """
+        query = f"{restaurant_name} 메뉴판 가격"
+        params = {
+            "query": query,
+            "display": 5,
+            "sort": "sim"
+        }
+        
+        try:
+            res = httpx.get(
+                NAVER_BLOG_SEARCH_API_URL,
+                headers=self.headers,
+                params=params,
+                timeout=2.0 # 빠른 응답 요구
+            )
+            
+            if res.status_code == 200:
+                data = res.json()
+                items = data.get("items", [])
+                
+                prices = []
+                for item in items:
+                    description = item.get("description", "")
+                    # HTML 태그 제거 및 텍스트 정제
+                    text = re.sub(r"<[^>]+>", "", description)
+                    
+                    # 가격 패턴 찾기 (숫자 + 원) - 예: 10,000원, 11000원
+                    # 너무 작은 숫자나 배달비 제외, 4자리 이상 숫자
+                    matches = re.findall(r'([0-9,]{3,})원', text)
+                    for m in matches:
+                        price = int(m.replace(",", ""))
+                        if 3000 <= price <= 300000: # 합리적인 범위
+                            prices.append(price)
+                            
+                if prices:
+                    # 가장 빈번하게 등장한 가격 또는 평균값? 
+                    # 보통 대표 메뉴 가격이 많이 언급됨.
+                    # 최빈값 찾기
+                    from collections import Counter
+                    most_common = Counter(prices).most_common(1)
+                    if most_common:
+                        return f"{most_common[0][0]:,}원"
+            
+        except Exception as e:
+            print(f"[ERROR] Blog search failed: {e}")
+            
+        return ""
 
     def _search_single_area(
         self,
@@ -272,18 +330,24 @@ class RestaurantSearcher:
             restaurants.append(restaurant)
 
         # 거리 필터링
+        # 거리 필터링
         filtered = [r for r in restaurants if r.distance_m <= radius]
 
+        final_results = []
         if filtered:
             filtered.sort(key=lambda r: r.distance_m)
-            return filtered[:display]
-
-        # 폴백: 전부 탈락 시 거리순 전체 반환
-        if restaurants:
+            final_results = filtered[:display]
+        elif restaurants:
+            # 폴백: 전부 탈락 시 거리순 전체 반환
             restaurants.sort(key=lambda r: r.distance_m)
-            return restaurants[:display]
+            final_results = restaurants[:display]
 
-        return []
+        # 최종 결과에 대해 가격 정보 채우기 (API 호출 최소화)
+        for r in final_results:
+             if not r.price:
+                 r.price = self.search_blog_for_price(r.name)
+
+        return final_results
 
     def search_with_expanded_radius(
         self,

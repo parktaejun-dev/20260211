@@ -40,6 +40,9 @@ def render_restaurant_card(restaurant: Restaurant, index: int):
                     distance_info = f" | {restaurant.distance_text} ({restaurant.walking_time})"
                 st.caption(f"📍 {address}{distance_info}")
 
+            if restaurant.price:
+                st.caption(f"💰 예상 가격: {restaurant.price}")
+
             if restaurant.phone:
                 st.caption(f"📞 {restaurant.phone}")
 
