@@ -11,12 +11,23 @@ _APP_DIR = Path(__file__).resolve().parent.parent
 _LOGO_PATH = _APP_DIR / "assets" / "kobaco_logo.png"
 
 
+import base64
+
 def render_header():
     """KOBACO 로고와 앱 헤더를 렌더링합니다."""
     col_logo, col_title = st.columns([1, 4])
     with col_logo:
         if _LOGO_PATH.exists():
-            st.image(str(_LOGO_PATH), width=80)
+            # 이미지를 Base64로 인코딩하여 클릭 가능한 HTML 링크로 렌더링
+            with open(_LOGO_PATH, "rb") as f:
+                img_data = f.read()
+                img_b64 = base64.b64encode(img_data).decode()
+            
+            # target="_self"로 현재 탭에서 리로드 (홈으로 이동 효과)
+            st.markdown(
+                f'<a href="/" target="_self"><img src="data:image/png;base64,{img_b64}" width="80"></a>',
+                unsafe_allow_html=True
+            )
     with col_title:
         st.markdown("## 부서점심 자동예약")
         st.caption("음식 종류 / 지역 / 예산 / 인원만 선택하면 맛집을 찾아드립니다!")
