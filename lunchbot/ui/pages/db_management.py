@@ -40,11 +40,18 @@ def _render_favorites():
             if memo:
                  st.caption(f"📝 {memo}")
             
-            col1, col2 = st.columns(2)
-            with col2:
-                if st.button("삭제", key=f"del_fav_{item['id']}"):
+            col_btn1, col_btn2 = st.columns(2)
+            with col_btn1:
+                if st.button("🚫 제외", key=f"fav_to_ex_{item['id']}", use_container_width=True):
                     db.remove_favorite(name, address)
-                    st.toast(f"{name} 즐겨찾기 삭제 완료")
+                    db.add_exclusion(name, address, "즐겨찾기에서 이동됨")
+                    st.toast(f"🚫 {name} 제외 목록으로 이동")
+                    st.rerun()
+
+            with col_btn2:
+                if st.button("삭제", key=f"del_fav_{item['id']}", use_container_width=True):
+                    db.remove_favorite(name, address)
+                    st.toast(f"🗑️ {name} 삭제 완료")
                     st.rerun()
 
 def _render_exclusions():
@@ -68,11 +75,18 @@ def _render_exclusions():
              if reason:
                  st.caption(f"📝 사유: {reason}")
 
-             col1, col2 = st.columns(2)
-             with col2:
-                if st.button("복구 (제외 해제)", key=f"restore_ex_{item['id']}"):
+             col_btn1, col_btn2 = st.columns(2)
+             with col_btn1:
+                if st.button("⭐ 즐겨찾기", key=f"ex_to_fav_{item['id']}", use_container_width=True):
                     db.remove_exclusion(name, address)
-                    st.toast(f"{name} 제외 해제 완료")
+                    db.add_favorite(name, address, "제외 목록에서 복구됨")
+                    st.toast(f"⭐ {name} 즐겨찾기로 이동")
+                    st.rerun()
+
+             with col_btn2:
+                if st.button("해제", key=f"restore_ex_{item['id']}", use_container_width=True):
+                    db.remove_exclusion(name, address)
+                    st.toast(f"✅ {name} 제외 해제 완료")
                     st.rerun()
 
 def _render_data_import():
