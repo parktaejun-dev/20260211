@@ -66,9 +66,24 @@ def render_restaurant_card(restaurant: Restaurant, index: int):
                         st.markdown(f"- [{review.title}]({review.link})")
 
         with col2:
-            # 1. 네이버 지도 버튼
+            # 1. 네이버 지도 버튼 (항상 표시)
+            # API에서 준 링크가 네이버 지도라면 그걸 사용, 아니면 검색어 기반 링크 사용
+            map_target_url = restaurant.map_url
+            homepage_url = ""
+            
             if restaurant.link:
-                st.link_button("🗺️ 네이버 지도", restaurant.link, use_container_width=True)
+                if "naver.com" in restaurant.link:
+                    # API 링크가 네이버 지도 관련이면, 더 정확한 이 링크를 지도 버튼에 사용
+                    map_target_url = restaurant.link
+                else:
+                    # API 링크가 외부 사이트(인스타 등)면 홈페이지 버튼용설정
+                    homepage_url = restaurant.link
+            
+            st.link_button("🗺️ 네이버 지도", map_target_url, use_container_width=True)
+            
+            # 2. 홈페이지 버튼 (별도 표시)
+            if homepage_url:
+                st.link_button("🏠 홈페이지", homepage_url, use_container_width=True)
             
             from core.db import db
             address_for_db = restaurant.road_address or restaurant.address
