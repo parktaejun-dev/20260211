@@ -130,7 +130,7 @@ class DatabaseManager:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT * FROM search_history ORDER BY created_at DESC LIMIT ?",
+                "SELECT * FROM search_history ORDER BY created_at DESC, id DESC LIMIT ?",
                 (limit,),
             )
             return [dict(row) for row in cursor.fetchall()]
@@ -172,7 +172,7 @@ class DatabaseManager:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM favorites ORDER BY created_at DESC")
+            cursor.execute("SELECT * FROM favorites ORDER BY created_at DESC, id DESC")
             return [dict(row) for row in cursor.fetchall()]
 
     # ─── 제외 목록 ──────────────────────────────────────────────
@@ -212,8 +212,42 @@ class DatabaseManager:
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM exclusions ORDER BY created_at DESC")
+            cursor.execute("SELECT * FROM exclusions ORDER BY created_at DESC, id DESC")
             return [dict(row) for row in cursor.fetchall()]
+
+
+    def search_favorites(self, query: str) -> list[dict]:
+        """즐겨찾기에서 검색합니다."""
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            pattern = f"%{query}%"
+            cursor.execute(
+                "SELECT * FROM favorites WHERE restaurant_name LIKE ? OR address LIKE ? OR memo LIKE ? ORDER BY created_at DESC, id DESC",
+                (pattern, pattern, pattern),
+            )
+            return [dict(row) for row in cursor.fetchall()]
+            
+    def import_favorites(self, data: list[dict]) -> int:
+        """
+        딕셔너리 리스트를 즐겨찾기에 일괄 추가합니다.
+        data example: [{'name': '..', 'address': '..', 'memo': '..'}]
+        Return: 추가된 개수
+        """
+        count = 0
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            for item in data:
+                try:
+                    cursor.execute(
+                        "INSERT INTO favorites (restaurant_name, address, memo) VALUES (?, ?, ?)",
+                        (item.get("name"), item.get("address", ""), item.get("memo", "")),
+                    )
+                    count += 1
+                except sqlite3.IntegrityError:
+                    continue # 중복 무시
+            conn.commit()
+        return count
 
 
 # 전역 인스턴스

@@ -23,8 +23,11 @@ from ui.styles import CUSTOM_CSS
 from ui.components import render_header
 from ui.pages.home import render_input_form, render_auto_select_button
 from ui.pages.search_results import render_search_results
-from ui.pages.history import render_history_page
+from ui.pages.search_results import render_search_results
+from ui.pages.history import render_history_tab
+from ui.pages.db_management import render_db_management_tab
 from utils.date_helper import format_date_korean
+from core.search import RestaurantSearcher, Restaurant
 
 
 # ── 페이지 설정 ──────────────────────────────────────────
@@ -76,7 +79,7 @@ if SESSION_KEY_INPUT_DATA not in st.session_state:
 render_header()
 
 # 탭 구성
-tab_search, tab_history = st.tabs(["🔍 맛집 검색", "📜 검색 이력"])
+tab_search, tab_history, tab_db = st.tabs(["🔍 맛집 검색", "📜 검색 이력", "🗄️ DB 관리"])
 
 
 def _run_search(form_data: dict) -> None:
@@ -86,6 +89,30 @@ def _run_search(form_data: dict) -> None:
 
     with st.spinner("🔍 맛집을 검색하고 있습니다..."):
         try:
+            # 1. DB 검색 모드
+            if form_data.get("source") == "db":
+                from core.db import db
+                raw_results = db.search_favorites(form_data["query"])
+                results = []
+                for row in raw_results:
+                    results.append(Restaurant(
+                        name=row["restaurant_name"],
+                        address=row["address"] or "",
+                        category="⭐ 즐겨찾기",
+                        description=row["memo"] or "내 DB 저장 맛집",
+                        distance_text="내 저장소",
+                        walking_time="",
+                    ))
+                
+                if not results:
+                    st.toast("검색 결과가 없습니다.", icon="⚠️")
+                
+                st.session_state[SESSION_KEY_SEARCH_RESULTS] = results
+                st.session_state[SESSION_KEY_INPUT_DATA] = form_data
+                st.rerun()
+                return
+
+            # 2. 네이버 검색 모드
             coords = form_data["area_coords"]
             searcher = RestaurantSearcher(
                 client_id=NAVER_CLIENT_ID,
@@ -189,6 +216,12 @@ with tab_search:
 
 
 # ── 이력 탭 ───────────────────────────────────────────────
+# ── 이력 탭 ───────────────────────────────────────────────
 with tab_history:
-    render_history_page()
+    render_history_tab()
+
+
+# ── DB 관리 탭 ───────────────────────────────────────────
+with tab_db:
+    render_db_management_tab()
 
