@@ -25,7 +25,7 @@ def render_auto_select_button() -> dict | None:
     st.markdown("### 🎲 자동 선택")
     st.caption(f"📍 기준: {AREA_CENTER['name']} | 반경 {DEFAULT_RADIUS // 1000}km | 전체 음식")
 
-    if st.button("🎲 자동으로 10곳 추천받기", type="primary", use_container_width=True):
+    if st.button("🎲 자동으로 3곳 추천받기", type="primary", use_container_width=True):
         default_date = get_next_monday()
         return {
             "cuisine": "전체",

@@ -143,9 +143,9 @@ def _run_search(form_data: dict) -> None:
                 if results:
                     st.info("검색 반경을 자동으로 넓혔습니다.")
 
-            # 자동선택 모드: 10개만 랜덤 선정
-            if form_data.get("auto_select") and results and len(results) > 10:
-                results = random.sample(results, 10)
+            # 자동선택 모드: 3개만 랜덤 선정
+            if form_data.get("auto_select") and results and len(results) > 3:
+                results = random.sample(results, 3)
 
             st.session_state[SESSION_KEY_SEARCH_RESULTS] = results
             st.session_state[SESSION_KEY_INPUT_DATA] = form_data
